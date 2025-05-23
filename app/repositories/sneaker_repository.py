@@ -1,11 +1,12 @@
+# sneaker_manager/app/repositories/sneaker_repository.py
 from sqlalchemy.orm import Session
 from ..models import Sneaker
 
-# sneaker_manager/app/repositories/sneaker_repository.py
 class SneakerRepository:
     @staticmethod
     def create(db: Session, sneaker_data: dict):
         sneaker = Sneaker(
+            #id = sneaker_data["id"],
             name=sneaker_data["name"],
             brand=sneaker_data["brand"],
             series=sneaker_data["series"],
