@@ -12,7 +12,8 @@ class SneakerRepository:
             purchase_date=sneaker_data["purchase_date"],
             purchase_price=sneaker_data["purchase_price"],
             image_path=sneaker_data["image_path"],
-            size=sneaker_data["size"]  # ✅ 新增字段
+            size=sneaker_data["size"],
+            color=sneaker_data["color"]
         )
         db.add(sneaker)
         db.commit()
