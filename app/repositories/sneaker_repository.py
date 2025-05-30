@@ -1,6 +1,6 @@
 # sneaker_manager/app/repositories/sneaker_repository.py
 from sqlalchemy.orm import Session
-from ..models import Sneaker
+from ..models import Sneaker, Rating
 
 class SneakerRepository:
     @staticmethod
@@ -33,3 +33,16 @@ class SneakerRepository:
             db.commit()
             return True
         return False
+
+    @staticmethod
+    def add_rating(db: Session, sneaker_id, cushion, traction, torsion, durability):
+        rating = Rating(
+            sneaker_id=sneaker_id,
+            cushion=cushion,
+            traction=traction,
+            torsion=torsion,
+            durability=durability
+        )
+        db.add(rating)
+        db.commit()
+        return rating
