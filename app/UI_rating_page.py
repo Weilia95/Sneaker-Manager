@@ -2,8 +2,8 @@ import customtkinter as ctk
 from .repositories.sneaker_repository import SneakerRepository
 from .database import get_db
 from tkinter import messagebox
-from sqlalchemy.orm import joinedload
 from .models import Sneaker
+
 class RatingPage:
     def __init__(self, root):
         self.root = root
@@ -29,7 +29,7 @@ class RatingPage:
     def open_rating_window(self, sneaker):
         popup = ctk.CTkToplevel(self.root)
         popup.title(f"评分：{sneaker.name}")
-        popup.geometry("400x500")
+        popup.geometry("500x580")
 
         label = ctk.CTkLabel(popup, text=f"{sneaker.brand} - {sneaker.name}", font=("Arial", 16))
         label.pack(pady=10)
