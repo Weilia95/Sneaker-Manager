@@ -30,8 +30,15 @@ class RatingPage:
         popup = ctk.CTkToplevel(self.root)
         popup.title(f"评分：{sneaker.name}")
         popup.geometry("500x580")
+        popup.minsize(500, 580)
+        popup.maxsize(500, 580)
+        popup.resizable(False, False)
 
-        label = ctk.CTkLabel(popup, text=f"{sneaker.brand} - {sneaker.name}", font=("Arial", 16))
+        # 添加主容器并带外边距
+        main_frame = ctk.CTkFrame(popup)
+        main_frame.pack(fill="both", expand=True, padx=20, pady=20)
+
+        label = ctk.CTkLabel(main_frame, text=f"{sneaker.brand} - {sneaker.name}", font=("Arial", 16))
         label.pack(pady=10)
 
         sliders = {}
@@ -42,7 +49,6 @@ class RatingPage:
             "耐磨": "durability"
         }
 
-        # ✅ 重新获取绑定 Session 的 sneaker 实例（包含 ratings）
         from sqlalchemy.orm import joinedload
         with get_db() as db_session:
             sneaker_in_db = db_session.query(Sneaker).options(joinedload(Sneaker.ratings)) \
@@ -51,14 +57,30 @@ class RatingPage:
             latest_rating = ratings[-1] if ratings else None
 
         for cn_label, field in slider_labels.items():
-            lbl = ctk.CTkLabel(popup, text=cn_label)
-            lbl.pack()
+            sub_frame = ctk.CTkFrame(main_frame)
+            sub_frame.pack(fill="x", pady=5)
 
-            slider = ctk.CTkSlider(popup, from_=1, to=100, orientation="horizontal")
+            lbl = ctk.CTkLabel(sub_frame, text=cn_label, width=60)
+            lbl.pack(side="left", padx=5)
+
+            slider = ctk.CTkSlider(
+                sub_frame,
+                from_=1,
+                to=100,
+                orientation="horizontal"
+            )
             value = getattr(latest_rating, field) if latest_rating else 50
             slider.set(value)
-            slider.pack(pady=5)
 
+            rating_label = ctk.CTkLabel(sub_frame, text=f"{int(value)}/100", width=40)
+            rating_label.pack(side="left", padx=5)
+
+            def make_update_func(label_):
+                return lambda val: label_.configure(text=f"{int(val)}/100")
+
+            slider.configure(command=make_update_func(rating_label))
+            slider.pack(side="left", expand=True, fill="x")
+            # ⭐️ 关键点：用中文键保存滑块对象到 sliders 字典中
             sliders[cn_label] = slider
 
         def submit_rating():
@@ -72,12 +94,13 @@ class RatingPage:
                     sliders["耐磨"].get()
                 )
             popup.destroy()
-            from tkinter import messagebox
             messagebox.showinfo("提示", "评分已提交！")
             self.refresh()
 
-        submit_btn = ctk.CTkButton(popup, text="提交评分", command=submit_rating)
+        submit_btn = ctk.CTkButton(main_frame, text="提交评分", command=submit_rating)
         submit_btn.pack(pady=20)
+
+        popup.grab_set()
 
     def refresh(self):
         """刷新评分页面"""
