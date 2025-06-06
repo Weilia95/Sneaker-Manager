@@ -18,16 +18,16 @@ updated on 2025/5/21
 
 - 编辑 / 删除球鞋信息
 - 添加使用记录（日期、场地、活动等）
-- 数据可视化：用 pyecharts 绘制使用频率、品牌统计等图表
-- 切换为 SQLAlchemy 管理数据库，提升扩展性
+- 数据可视化：用 pyecharts 绘制使用频率、品牌统计等图表 [待开发]
+- SQLAlchemy 管理数据库，提升扩展性
 - 多字段筛选 / 搜索功能
-- 数据导出为 Excel / CSV
+- 数据导出为 Excel / CSV [待开发]
 
 ---
 
 ## 🖼️ 项目截图
 
-👉 *To be uploaded LOL*
+👉 *To be uploaded *
 
 ---
 
