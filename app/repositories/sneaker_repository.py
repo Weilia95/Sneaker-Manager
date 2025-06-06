@@ -1,5 +1,5 @@
 # sneaker_manager/app/repositories/sneaker_repository.py
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session,joinedload
 from ..models import Sneaker, Rating
 
 class SneakerRepository:
@@ -23,7 +23,8 @@ class SneakerRepository:
 
     @staticmethod
     def get_all(db: Session):
-        return db.query(Sneaker).all()
+        #return db.query(Sneaker).all()
+        return db.query(Sneaker).options(joinedload(Sneaker.ratings)).all()
 
     @staticmethod
     def delete(db: Session, sneaker_id: int):
