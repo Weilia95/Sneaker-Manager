@@ -1,5 +1,6 @@
 import customtkinter as ctk
 
+
 class SettingsPage:
     def __init__(self, root):
         self.root = root

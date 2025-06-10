@@ -2,7 +2,6 @@
 import customtkinter as ctk
 from tkinter import messagebox
 from .repositories.sneaker_repository import SneakerRepository
-
 from .database import get_db
 from .rating_service import calculate_total_score, sort_by_total_score_desc, sort_by_total_score_asc, sort_by_dimension
 from .models import Sneaker

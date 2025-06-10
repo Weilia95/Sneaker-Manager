@@ -1,6 +1,7 @@
 # app/repositories/rating_repository.py
 from app.models import Rating
 
+
 def get_all_ratings_by_sneaker_id(sneaker_id):
     """
     获取某双球鞋的所有评分记录

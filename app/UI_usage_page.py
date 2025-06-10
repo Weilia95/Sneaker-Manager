@@ -7,6 +7,7 @@ from app.services import usage_record_service
 from app.repositories.sneaker_repository import SneakerRepository
 from app.database import get_db
 
+
 class UsagePage(ctk.CTkFrame):
     def __init__(self, master, **kwargs):
         super().__init__(master, **kwargs)
@@ -136,7 +137,8 @@ class UsagePage(ctk.CTkFrame):
 
             activity_var = tk.StringVar(value="穿着通勤")
             activity_menu = ctk.CTkOptionMenu(frame,
-                                              values=["购入", "穿着打球", "穿着通勤", "穿着休闲", "穿着旅游", "损坏", "送修复", "挂卖", "卖出"],
+                                              values=["购入", "穿着打球", "穿着通勤", "穿着休闲", "穿着旅游", "损坏",
+                                                      "送修复", "挂卖", "卖出"],
                                               variable=activity_var)
             activity_menu.grid(row=0, column=1, padx=5)
 
