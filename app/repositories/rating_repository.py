@@ -1,7 +1,5 @@
 # app/repositories/rating_repository.py
 from app.models import Rating
-#from app import db
-
 
 def get_all_ratings_by_sneaker_id(sneaker_id):
     """
