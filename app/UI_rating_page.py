@@ -1,20 +1,15 @@
-
 import customtkinter as ctk
 from tkinter import messagebox
-from .repositories.sneaker_repository import SneakerRepository
-from .database import get_db
-from .rating_service import calculate_total_score, sort_by_total_score_desc, sort_by_total_score_asc, sort_by_dimension
-from .models import Sneaker
+from app.repositories.sneaker_repository import SneakerRepository
+from app.database import get_db
+from app.rating_service import calculate_total_score, sort_by_total_score_desc, sort_by_total_score_asc, sort_by_dimension
+from app.models import Sneaker
 
+class RatingPage(ctk.CTkFrame):
+    def __init__(self, master, **kwargs):
+        super().__init__(master, **kwargs)
+        self.configure(fg_color="#1e1e2d")
 
-class RatingPage:
-    def __init__(self, root):
-        self.root = root
-        self.page_frame = ctk.CTkFrame(self.root)
-        self.page_frame.pack(fill="both", expand=True)
-        self.parent_frame = self.page_frame  # 确保 refresh 能正确引用
-
-        # 排序选项
         self.sort_var = ctk.StringVar(value="默认排序")
         sort_options = [
             "默认排序",
@@ -25,35 +20,46 @@ class RatingPage:
             "抗扭从高到低",
             "耐磨从高到低"
         ]
+
         self.sort_menu = ctk.CTkOptionMenu(
-            self.page_frame,
+            self,
             values=sort_options,
             variable=self.sort_var,
-            command=self.on_sort_change
+            command=self.on_sort_change,
+            fg_color="#3e3e5b",
+            button_color="#3e3e5b",
+            text_color="white",
+            dropdown_fg_color="#2d2d44",
+            dropdown_text_color="white"
         )
-        self.sort_menu.pack(pady=10, anchor="w")
+        self.sort_menu.pack(pady=10, anchor="w", padx=20)
 
-        # 初始化加载数据
+        self.content_frame = ctk.CTkFrame(self, fg_color="transparent")
+        self.content_frame.pack(fill="both", expand=True, padx=20, pady=10)
+
         self.sneakers = []
-        self.load_sneaker_rating_ui(self.page_frame)
+        self.load_sneaker_rating_ui(self.content_frame)
 
-    def load_sneaker_rating_ui(self, parent_frame,sneakers=None):
+    def load_sneaker_rating_ui(self, parent_frame, sneakers=None):
+        for widget in parent_frame.winfo_children():
+            widget.destroy()
+
         if sneakers is None:
             with get_db() as db_session:
                 self.sneakers = SneakerRepository.get_all(db_session)
 
         for sneaker in self.sneakers:
-            frame = ctk.CTkFrame(parent_frame)
-            frame.pack(fill="x", pady=5, padx=10)
+            card = ctk.CTkFrame(parent_frame, fg_color="#2d2d44", corner_radius=10, border_width=1, border_color="#3e3e5b")
+            card.pack(fill="x", pady=5, padx=10)
 
             total_score = calculate_total_score(sneaker.ratings)
             score_text = f"总分: {total_score:.0f}" if total_score is not None else "暂无评分"
 
-            label = ctk.CTkLabel(frame, text=f"{sneaker.brand} - {sneaker.name} | {score_text}")
-            label.pack(side="left", padx=5)
+            label = ctk.CTkLabel(card, text=f"{sneaker.brand} - {sneaker.name} | {score_text}", text_color="white", font=("微软雅黑", 16))
+            label.pack(side="left", padx=10, pady=10)
 
-            button = ctk.CTkButton(frame, text="评分", width=60, command=lambda s=sneaker: self.open_rating_window(s))
-            button.pack(side="right", padx=5)
+            button = ctk.CTkButton(card, text="评分", width=80, fg_color="#3e3e5b", hover_color="#4c4c70", text_color="white", command=lambda s=sneaker: self.open_rating_window(s))
+            button.pack(side="right", padx=10)
 
     def on_sort_change(self, choice):
         if choice == "默认排序":
@@ -75,17 +81,15 @@ class RatingPage:
         self.refresh()
 
     def open_rating_window(self, sneaker):
-        popup = ctk.CTkToplevel(self.root)
+        popup = ctk.CTkToplevel(self)
         popup.title(f"评分：{sneaker.name}")
         popup.geometry("500x580")
-        popup.minsize(500, 580)
-        popup.maxsize(500, 580)
         popup.resizable(False, False)
 
-        main_frame = ctk.CTkFrame(popup)
+        main_frame = ctk.CTkFrame(popup, fg_color="#1e1e2d")
         main_frame.pack(fill="both", expand=True, padx=20, pady=20)
 
-        label = ctk.CTkLabel(main_frame, text=f"{sneaker.brand} - {sneaker.name}", font=("Arial", 16))
+        label = ctk.CTkLabel(main_frame, text=f"{sneaker.brand} - {sneaker.name}", font=("微软雅黑", 16), text_color="white")
         label.pack(pady=10)
 
         sliders = {}
@@ -98,23 +102,22 @@ class RatingPage:
 
         from sqlalchemy.orm import joinedload
         with get_db() as db_session:
-            sneaker_in_db = db_session.query(Sneaker).options(joinedload(Sneaker.ratings)) \
-                .filter(Sneaker.id == sneaker.id).first()
+            sneaker_in_db = db_session.query(Sneaker).options(joinedload(Sneaker.ratings)).filter(Sneaker.id == sneaker.id).first()
             ratings = sneaker_in_db.ratings
             latest_rating = ratings[-1] if ratings else None
 
         for cn_label, field in slider_labels.items():
-            sub_frame = ctk.CTkFrame(main_frame)
+            sub_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
             sub_frame.pack(fill="x", pady=5)
 
-            lbl = ctk.CTkLabel(sub_frame, text=cn_label, width=60)
+            lbl = ctk.CTkLabel(sub_frame, text=cn_label, width=60, text_color="white")
             lbl.pack(side="left", padx=5)
 
-            slider = ctk.CTkSlider(sub_frame, from_=1, to=100, orientation="horizontal")
+            slider = ctk.CTkSlider(sub_frame, from_=1, to=100, orientation="horizontal", progress_color="#4c4c70")
             value = getattr(latest_rating, field) if latest_rating else 50
             slider.set(value)
 
-            rating_label = ctk.CTkLabel(sub_frame, text=f"{int(value)}/100", width=40)
+            rating_label = ctk.CTkLabel(sub_frame, text=f"{int(value)}/100", width=40, text_color="white")
             rating_label.pack(side="left", padx=5)
 
             def make_update_func(label_):
@@ -138,20 +141,10 @@ class RatingPage:
             messagebox.showinfo("提示", "评分已提交！")
             self.refresh()
 
-        submit_btn = ctk.CTkButton(main_frame, text="提交评分", command=submit_rating)
+        submit_btn = ctk.CTkButton(main_frame, text="提交评分", fg_color="#3e3e5b", hover_color="#4c4c70", text_color="white", command=submit_rating)
         submit_btn.pack(pady=20)
 
         popup.grab_set()
 
     def refresh(self):
-        """刷新评分页面"""
-        for widget in self.parent_frame.winfo_children():
-            if isinstance(widget, ctk.CTkFrame) and widget != self.sort_menu._canvas.master:
-                widget.destroy()
-
-        self.sort_menu.pack(pady=10, anchor="w")
-        self.load_sneaker_rating_ui(self.parent_frame,self.sneakers)
-
-
-
-
+        self.load_sneaker_rating_ui(self.content_frame, self.sneakers)

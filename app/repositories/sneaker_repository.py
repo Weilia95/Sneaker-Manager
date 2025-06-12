@@ -47,3 +47,12 @@ class SneakerRepository:
         db.add(rating)
         db.commit()
         return rating
+
+    @staticmethod
+    def update(db, sneaker_id, sneaker_data):
+        sneaker = db.query(Sneaker).filter_by(id=sneaker_id).first()
+        if sneaker:
+            for key, value in sneaker_data.items():
+                setattr(sneaker, key, value)
+        else:
+            raise ValueError("未找到该球鞋")

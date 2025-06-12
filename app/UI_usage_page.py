@@ -1,16 +1,16 @@
 import tkinter as tk
-from tkinter import messagebox
 import customtkinter as ctk
 from tkcalendar import Calendar
 from datetime import date, datetime
+from tkinter import messagebox
 from app.services import usage_record_service
 from app.repositories.sneaker_repository import SneakerRepository
 from app.database import get_db
 
-
 class UsagePage(ctk.CTkFrame):
     def __init__(self, master, **kwargs):
         super().__init__(master, **kwargs)
+        self.configure(fg_color="#1e1e2d")
 
         self.grid_columnconfigure(0, weight=1)
         self.grid_columnconfigure(1, weight=2)
@@ -28,19 +28,12 @@ class UsagePage(ctk.CTkFrame):
             day=today.day,
             date_pattern='yyyy-mm-dd',
             background='#f5f7fa',
-            disabledbackground='#e0e0e0',
-            bordercolor='#d0d7de',
-            headersbackground='#dbe9f4',
-            headersforeground='#000000',
             foreground='#000000',
-            normalbackground='#ffffff',
-            weekendbackground='#f0f4f8',
             selectbackground='#4caf50',
             selectforeground='#ffffff',
-            font=('Microsoft YaHei', 10),
-            borderwidth=2
+            font=('Microsoft YaHei', 10)
         )
-        self.calendar.grid(row=0, column=0, padx=10, pady=20, sticky="nsew")
+        self.calendar.grid(row=0, column=0, padx=20, pady=20, sticky="nsew")
 
         for d in self.used_dates:
             self.calendar.calevent_create(d, '使用记录', 'used')
@@ -48,21 +41,23 @@ class UsagePage(ctk.CTkFrame):
 
         self.calendar.bind("<<CalendarSelected>>", self.on_date_selected)
 
-        right_frame = ctk.CTkFrame(self)
-        right_frame.grid(row=0, column=1, padx=10, pady=10, sticky="nsew")
+        right_frame = ctk.CTkFrame(self, fg_color="transparent")
+        right_frame.grid(row=0, column=1, padx=20, pady=20, sticky="nsew")
         right_frame.grid_rowconfigure(1, weight=1)
 
-        button_frame = ctk.CTkFrame(right_frame)
+        button_frame = ctk.CTkFrame(right_frame, fg_color="transparent")
         button_frame.grid(row=0, column=0, sticky="e", padx=10, pady=5)
 
-        self.add_button = ctk.CTkButton(button_frame, text="添加/修改记录", command=self.open_add_record_dialog)
+        self.add_button = ctk.CTkButton(button_frame, text="添加/修改记录", fg_color="#3e3e5b", hover_color="#4c4c70", text_color="white", command=self.open_add_record_dialog)
         self.add_button.pack(side="left", padx=5)
 
-        self.delete_button = ctk.CTkButton(button_frame, text="删除记录", command=self.delete_records)
+        self.delete_button = ctk.CTkButton(button_frame, text="删除记录", fg_color="#3e3e5b", hover_color="#4c4c70", text_color="white", command=self.delete_records)
         self.delete_button.pack(side="left", padx=5)
 
-        self.details_label = ctk.CTkLabel(right_frame, text="请选择日期查看穿鞋记录", justify="left", anchor="nw")
+        self.details_label = ctk.CTkLabel(right_frame, text="请选择日期查看穿鞋记录", justify="left", anchor="nw", text_color="white", font=("微软雅黑", 14))
         self.details_label.grid(row=1, column=0, sticky="nsew", padx=10, pady=10)
+
+    # 下面的逻辑无需改动，之前写得很好
 
     def get_used_dates(self):
         data = usage_record_service.get_daily_usage_records()
