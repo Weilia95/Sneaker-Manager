@@ -12,9 +12,20 @@ class UsagePage(ctk.CTkFrame):
         super().__init__(master, **kwargs)
         self.configure(fg_color="#1e1e2d")
 
+        # ── 第一行：标题栏 ───────────────────────────────────
+        header = ctk.CTkFrame(self, fg_color="#2d2d44", corner_radius=10)
+        header.grid(row=0, column=0, sticky="ew", padx=20, pady=(20, 10))
+        header.grid_columnconfigure(0, weight=1)
+        ctk.CTkLabel(
+            header,
+            text="球鞋使用",
+            font=("微软雅黑", 20, "bold"),
+            text_color="white"
+        ).grid(row=0, column=0, padx=20, pady=10, sticky="w")
+
+        # ── 从这里开始，把原本的 grid row 全部下移 1 ─────────────
         self.grid_columnconfigure(0, weight=1)
-        self.grid_columnconfigure(1, weight=2)
-        self.grid_rowconfigure(0, weight=1)
+        self.grid_rowconfigure(1, weight=1)
 
         self.used_dates = self.get_used_dates()
         self.selected_date = None
@@ -28,12 +39,19 @@ class UsagePage(ctk.CTkFrame):
             day=today.day,
             date_pattern='yyyy-mm-dd',
             background='#f5f7fa',
+            disabledbackground='#e0e0e0',
+            bordercolor='#d0d7de',
+            headersbackground='#dbe9f4',
+            headersforeground='#000000',
             foreground='#000000',
+            normalbackground='#ffffff',
+            weekendbackground='#f0f4f8',
             selectbackground='#4caf50',
             selectforeground='#ffffff',
-            font=('Microsoft YaHei', 10)
+            font=('Microsoft YaHei', 10),
+            borderwidth=2
         )
-        self.calendar.grid(row=0, column=0, padx=20, pady=20, sticky="nsew")
+        self.calendar.grid(row=1, column=0, padx=10, pady=10, sticky="nsew")
 
         for d in self.used_dates:
             self.calendar.calevent_create(d, '使用记录', 'used')
@@ -42,7 +60,7 @@ class UsagePage(ctk.CTkFrame):
         self.calendar.bind("<<CalendarSelected>>", self.on_date_selected)
 
         right_frame = ctk.CTkFrame(self, fg_color="transparent")
-        right_frame.grid(row=0, column=1, padx=20, pady=20, sticky="nsew")
+        right_frame.grid(row=1, column=1, padx=10, pady=10, sticky="nsew")
         right_frame.grid_rowconfigure(1, weight=1)
 
         button_frame = ctk.CTkFrame(right_frame, fg_color="transparent")

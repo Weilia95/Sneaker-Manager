@@ -191,21 +191,21 @@ class SneakerMainPage(ctk.CTkFrame):
     def open_sneaker_form(self, sneaker=None):
         form = ctk.CTkToplevel(self)
         form.title("新增球鞋" if sneaker is None else "修改球鞋")
-        form.geometry("400x400")
+        form.geometry("400x450")
         form.grab_set()
 
+        # 1. 普通字段
         fields = ["名称", "品牌", "系列", "购入日期", "购入价格", "尺码", "颜色"]
         entries = {}
-
         for idx, field in enumerate(fields):
-            label = ctk.CTkLabel(form, text=field)
-            label.grid(row=idx, column=0, padx=5, pady=5)
-            entry = ctk.CTkEntry(form)
-            entry.grid(row=idx, column=1, padx=5, pady=5)
-            entries[field] = entry
+            lbl = ctk.CTkLabel(form, text=field)
+            lbl.grid(row=idx, column=0, padx=5, pady=5, sticky="w")
+            ent = ctk.CTkEntry(form)
+            ent.grid(row=idx, column=1, padx=5, pady=5, sticky="ew")
+            entries[field] = ent
 
+        # 2. 如果是编辑，预填数据
         image_paths = []
-
         if sneaker:
             entries["名称"].insert(0, sneaker.name)
             entries["品牌"].insert(0, sneaker.brand)
@@ -214,36 +214,38 @@ class SneakerMainPage(ctk.CTkFrame):
             entries["购入价格"].insert(0, str(sneaker.purchase_price))
             entries["尺码"].insert(0, str(sneaker.size))
             entries["颜色"].insert(0, sneaker.color)
-            image_paths = sneaker.image_path.split(';') if sneaker.image_path else []
+            image_paths = sneaker.image_path.split(";") if sneaker.image_path else []
 
+        # 3. 状态下拉，用局部变量，不是 self.status_var
+        status_var = ctk.StringVar(value=(sneaker.status if sneaker else "使用中"))
+        ctk.CTkLabel(form, text="使用状态").grid(row=len(fields), column=0, padx=5, pady=5, sticky="w")
+        status_menu = ctk.CTkOptionMenu(
+            form,
+            values=["收藏中", "使用中", "修复中", "闲置中", "售卖中", "已卖出"],
+            variable=status_var
+        )
+        status_menu.grid(row=len(fields), column=1, padx=5, pady=5, sticky="ew")
+
+        # 4. 图片上传
         def upload_images():
-            paths = filedialog.askopenfilenames(title="选择图片", filetypes=[("Image Files", "*.png;*.jpg;*.jpeg")])
+            paths = filedialog.askopenfilenames(
+                title="选择图片",
+                filetypes=[("Image Files", "*.png;*.jpg;*.jpeg")]
+            )
             if paths:
                 image_paths.clear()
                 image_paths.extend(paths)
 
-        upload_button = ctk.CTkButton(form, text="上传图片", command=upload_images)
-        upload_button.grid(row=len(fields), column=0, columnspan=2, pady=5)
+        up_btn = ctk.CTkButton(form, text="上传图片", command=upload_images)
+        up_btn.grid(row=len(fields) + 1, column=0, columnspan=2, pady=5)
 
+        # 5. 保存按钮及逻辑
         def save():
-            with get_db() as db:
-                try:
+            try:
+                with get_db() as db:
                     if sneaker:
-                        # 更新数据库
-                        sneaker.name = entries["名称"].get()
-                        sneaker.brand = entries["品牌"].get()
-                        sneaker.series = entries["系列"].get()
-                        sneaker.purchase_date = entries["购入日期"].get()
-                        sneaker.purchase_price = float(entries["购入价格"].get())
-                        sneaker.size = float(entries["尺码"].get())
-                        sneaker.color = entries["颜色"].get()
-                        sneaker.image_path = ';'.join(image_paths)
-
-                        # 加入这句：让数据库知道这个对象被更新
-                        db.merge(sneaker)
-                        db.commit()
-                    else:
-                        new_sneaker = {
+                        # 1) 取出一个 update_data 字典，包含所有字段
+                        update_data = {
                             "name": entries["名称"].get(),
                             "brand": entries["品牌"].get(),
                             "series": entries["系列"].get(),
@@ -251,19 +253,40 @@ class SneakerMainPage(ctk.CTkFrame):
                             "purchase_price": float(entries["购入价格"].get()),
                             "size": float(entries["尺码"].get()),
                             "color": entries["颜色"].get(),
-                            "image_path": ';'.join(image_paths)
+                            "image_path": ";".join(image_paths),
+                            "status": status_var.get()  # 一定要把状态也传进去
                         }
-                        SneakerRepository.create(db, new_sneaker)
-                        db.commit()
+                        # 2) 用仓库层 update 接口
+                        SneakerRepository.update(db, sneaker.id, update_data)
 
-                    self.refresh_sneaker_list()
-                    messagebox.showinfo("成功", "保存成功！")
-                    form.destroy()
-                except Exception as e:
-                    messagebox.showerror("错误", f"保存失败：{e}")
+                    else:
+                        # 新增分支不变
+                        new_data = {
+                            "name": entries["名称"].get(),
+                            "brand": entries["品牌"].get(),
+                            "series": entries["系列"].get(),
+                            "purchase_date": entries["购入日期"].get(),
+                            "purchase_price": float(entries["购入价格"].get()),
+                            "size": float(entries["尺码"].get()),
+                            "color": entries["颜色"].get(),
+                            "image_path": ";".join(image_paths),
+                            "status": status_var.get()  # 新增也可以写明状态
+                        }
+                        SneakerRepository.create(db, new_data)
 
-        save_button = ctk.CTkButton(form, text="保存", command=save)
-        save_button.grid(row=len(fields) + 1, column=0, columnspan=2, pady=10)
+                # 3) 全部保存成功后刷新 UI
+                messagebox.showinfo("成功", "保存成功！")
+                form.destroy()
+                self.refresh_sneaker_list()
+
+            except Exception as e:
+                messagebox.showerror("错误", f"保存失败：{e}")
+
+        save_btn = ctk.CTkButton(form, text="保存", command=save)
+        save_btn.grid(row=len(fields) + 2, column=0, columnspan=2, pady=15)
+
+        # 让第二列可以拉伸
+        form.grid_columnconfigure(1, weight=1)
 
     def create_sneaker_card(self, sneaker):
         card = ctk.CTkFrame(

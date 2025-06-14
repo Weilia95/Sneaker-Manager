@@ -10,6 +10,17 @@ class RatingPage(ctk.CTkFrame):
         super().__init__(master, **kwargs)
         self.configure(fg_color="#1e1e2d")
 
+        # ── 第一行：标题栏 ───────────────────────────────────
+        header = ctk.CTkFrame(self, fg_color="#2d2d44", corner_radius=10)
+        header.pack(fill="x", padx=20, pady=(20, 10))
+        ctk.CTkLabel(
+            header,
+            text="评分库",
+            font=("微软雅黑", 20, "bold"),
+            text_color="white"
+        ).pack(side="left", padx=20, pady=10)
+
+        # ── 排序选单 ───────────────────────────────────────
         self.sort_var = ctk.StringVar(value="默认排序")
         sort_options = [
             "默认排序",
@@ -32,8 +43,9 @@ class RatingPage(ctk.CTkFrame):
             dropdown_fg_color="#2d2d44",
             dropdown_text_color="white"
         )
-        self.sort_menu.pack(pady=10, anchor="w", padx=20)
+        self.sort_menu.pack(padx=20, anchor="w", pady=(0,10))
 
+        # ── 内容区 ─────────────────────────────────────────
         self.content_frame = ctk.CTkFrame(self, fg_color="transparent")
         self.content_frame.pack(fill="both", expand=True, padx=20, pady=10)
 

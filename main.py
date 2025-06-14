@@ -16,7 +16,7 @@ if __name__ == "__main__":
     app.withdraw()  # 隐藏主窗口
 
     # 显示 splash，关闭后显示主程序
-    splash = SplashScreen(app, image_path="app/assets/splash_image.png", display_time=3000)
+    splash = SplashScreen(app, image_path="app/assets/splash_image.png", display_time=1995)
     splash.show()
 
     # 启动主循环

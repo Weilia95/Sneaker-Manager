@@ -1,6 +1,7 @@
 # sneaker_manager/app/repositories/sneaker_repository.py
-from sqlalchemy.orm import Session,joinedload
+from sqlalchemy.orm import Session, joinedload
 from ..models import Sneaker, Rating
+
 
 class SneakerRepository:
     @staticmethod
@@ -14,7 +15,8 @@ class SneakerRepository:
             purchase_price=sneaker_data["purchase_price"],
             image_path=sneaker_data["image_path"],
             size=sneaker_data["size"],
-            color=sneaker_data["color"]
+            color=sneaker_data["color"],
+            status=sneaker_data.get("status", "使用中")  # ← 新增这一行
         )
         db.add(sneaker)
         db.commit()
@@ -23,7 +25,6 @@ class SneakerRepository:
 
     @staticmethod
     def get_all(db: Session):
-        #return db.query(Sneaker).all()
         return db.query(Sneaker).options(joinedload(Sneaker.ratings)).all()
 
     @staticmethod
@@ -49,10 +50,13 @@ class SneakerRepository:
         return rating
 
     @staticmethod
-    def update(db, sneaker_id, sneaker_data):
+    def update(db: Session, sneaker_id: int, sneaker_data: dict):
         sneaker = db.query(Sneaker).filter_by(id=sneaker_id).first()
-        if sneaker:
-            for key, value in sneaker_data.items():
-                setattr(sneaker, key, value)
-        else:
+        if not sneaker:
             raise ValueError("未找到该球鞋")
+        for k, v in sneaker_data.items():
+            setattr(sneaker, k, v)
+        db.commit()
+        db.refresh(sneaker)
+        return sneaker
+
