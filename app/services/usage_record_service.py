@@ -2,7 +2,7 @@ from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
 from app.models import UsageRecord, Sneaker
 from app.database import get_db
-from sqlalchemy import func
+from sqlalchemy import func,desc
 from pyecharts.charts import Line, Bar
 from pyecharts import options as opts
 
@@ -173,3 +173,53 @@ def delete_records_by_date(date_str):
             UsageRecord.date == datetime.strptime(date_str, "%Y-%m-%d").date()).delete()
         db.commit()
         return deleted > 0  # 返回是否真的删除了数据
+
+
+def get_monthly_most_frequent():
+    """返回近30天穿着次数最多的球鞋及次数"""
+    with get_db() as db:
+        since = datetime.today().date() - timedelta(days=30)
+        res = (
+            db.query(UsageRecord.sneaker_id, func.count(UsageRecord.id).label("cnt"))
+              .filter(UsageRecord.date >= since)
+              .group_by(UsageRecord.sneaker_id)
+              .order_by(desc("cnt"))
+              .first()
+        )
+        if not res:
+            return None
+        sid, cnt = res
+        snk = db.query(Sneaker).get(sid)
+        return {"sneaker": snk, "value": cnt}
+
+def get_monthly_longest_duration():
+    """返回近30天累计穿着时长最长的球鞋及总时长（分钟）"""
+    with get_db() as db:
+        since = datetime.today().date() - timedelta(days=30)
+        res = (
+            db.query(UsageRecord.sneaker_id, func.sum(UsageRecord.duration).label("total"))
+              .filter(UsageRecord.date >= since)
+              .group_by(UsageRecord.sneaker_id)
+              .order_by(desc("total"))
+              .first()
+        )
+        if not res:
+            return None
+        sid, total = res
+        snk = db.query(Sneaker).get(sid)
+        return {"sneaker": snk, "value": total}
+
+def get_all_time_most_frequent():
+    """返回历史累计穿着次数最多的球鞋及次数"""
+    with get_db() as db:
+        res = (
+            db.query(UsageRecord.sneaker_id, func.count(UsageRecord.id).label("cnt"))
+              .group_by(UsageRecord.sneaker_id)
+              .order_by(desc("cnt"))
+              .first()
+        )
+        if not res:
+            return None
+        sid, cnt = res
+        snk = db.query(Sneaker).get(sid)
+        return {"sneaker": snk, "value": cnt}
