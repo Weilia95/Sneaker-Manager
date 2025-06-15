@@ -1,4 +1,4 @@
-# UI_sneaker_page.py 修改后
+# UI_sneaker_page.py
 import tkinter as tk
 import customtkinter as ctk
 from tkinter import messagebox, filedialog
@@ -8,11 +8,17 @@ from PIL import Image, ImageTk
 import os
 from datetime import datetime
 
+# 可选品牌列表
+BRAND_OPTIONS = [
+    "Nike", "Jordan", "Adidas", "ASICS", "Under Armour", "New Balance", "Puma", "Converse", "Reebok", "FILA", "Mizuno",
+    "Onitsuka Tiger", "Saucony", "Kappa", "Umbro", "李宁", "安踏", "匹克", "361度", "特步", "中国乔丹", "SPO", "EQLZ草牌", "准者", "迪卡侬",
+    "昂跑", "斯凯奇", "Salomon", "凯乐石", "其他"
+]
 
 class SneakerMainPage(ctk.CTkFrame):
     def __init__(self, master, sneaker_service, **kwargs):
         super().__init__(master, **kwargs)
-        self.configure(fg_color="#1e1e2d")  # 设置深色背景
+        self.configure(fg_color="#1e1e2d")
 
         self.active_frame = None
         self.sneaker_service = sneaker_service
@@ -22,11 +28,13 @@ class SneakerMainPage(ctk.CTkFrame):
         self.selected_sneaker = None
         self.selected_card = None
         self.filtered_sneakers = []
+        self.current_view = "list"
+        self.wall_background = None
 
         self.grid_rowconfigure(3, weight=1)
         self.grid_columnconfigure(0, weight=1)
 
-        # 第一行 标题 + 按钮 - 卡片风格
+        # === 第一行：标题 + 操作按钮 ===
         self.header_frame = ctk.CTkFrame(self, fg_color="#2d2d44", corner_radius=10)
         self.header_frame.grid(row=0, column=0, sticky="ew", padx=20, pady=10)
         self.header_frame.grid_columnconfigure(1, weight=1)
@@ -39,135 +47,55 @@ class SneakerMainPage(ctk.CTkFrame):
         )
         self.title_label.grid(row=0, column=0, padx=20, pady=10, sticky="w")
 
-        # 按钮容器
         button_frame = ctk.CTkFrame(self.header_frame, fg_color="transparent")
-        button_frame.grid(row=0, column=1, padx=10, pady=10, sticky="e")
+        button_frame.grid(row=0, column=1, sticky="e", padx=10)
 
-        # 按钮样式
-        button_style = {
-            "width": 40,
-            "height": 40,
-            "corner_radius": 20,
-            "fg_color": "#3e3e5b",
-            "hover_color": "#4c4c70",
-            "text_color": "white"
+        btn_style = {
+            "width": 40, "height": 40, "corner_radius": 20,
+            "fg_color": "#3e3e5b", "hover_color": "#4c4c70", "text_color": "white"
         }
+        ctk.CTkButton(button_frame, text="⇄", **btn_style, command=self.switch_view).pack(side="right", padx=5)
+        ctk.CTkButton(button_frame, text="🗑", **btn_style, command=self.delete_sneaker).pack(side="right", padx=5)
+        ctk.CTkButton(button_frame, text="✎", **btn_style, command=self.edit_sneaker).pack(side="right", padx=5)
+        ctk.CTkButton(button_frame, text="+", **btn_style, command=lambda: self.open_sneaker_form()).pack(side="right", padx=5)
 
-        self.switch_button = ctk.CTkButton(
-            button_frame, text="⇄切换视图", **button_style, command=self.switch_view
-        )
-        self.switch_button.pack(side="right", padx=5)
-
-        self.delete_button = ctk.CTkButton(
-            button_frame, text="🗑删除球鞋", **button_style, command=self.delete_sneaker
-        )
-        self.delete_button.pack(side="right", padx=5)
-
-        self.edit_button = ctk.CTkButton(
-            button_frame, text="✎修改球鞋", **button_style, command=self.edit_sneaker
-        )
-        self.edit_button.pack(side="right", padx=5)
-
-        self.add_button = ctk.CTkButton(
-            button_frame, text="+新增球鞋", **button_style, command=lambda: self.open_sneaker_form()
-
-        )
-        self.add_button.pack(side="right", padx=5)
-
-        # 第二行统计信息 - 卡片风格
+        # === 第二行：统计信息 ===
         self.stats_frame = ctk.CTkFrame(self, fg_color="#2d2d44", corner_radius=10)
         self.stats_frame.grid(row=1, column=0, sticky="ew", padx=20, pady=10)
-
-        # 统计卡片
-        stat_style = {
-            "font": ("微软雅黑", 14),
-            "text_color": "#e0e0e0"
-        }
-
+        stat_style = {"font": ("微软雅黑", 14), "text_color": "#e0e0e0"}
         self.total_label = ctk.CTkLabel(self.stats_frame, text="总球鞋数: 0", **stat_style)
-        self.total_label.pack(side="left", padx=20, pady=10)
-
         self.total_value_label = ctk.CTkLabel(self.stats_frame, text="总价值: 0元", **stat_style)
-        self.total_value_label.pack(side="left", padx=20, pady=10)
-
         self.average_value_label = ctk.CTkLabel(self.stats_frame, text="平均价值: 0元", **stat_style)
+        self.total_label.pack(side="left", padx=20, pady=10)
+        self.total_value_label.pack(side="left", padx=20, pady=10)
         self.average_value_label.pack(side="left", padx=20, pady=10)
 
-        # 第三行 搜索区域 - 卡片风格
+        # === 第三行：搜索区域 ===
         self.search_frame = ctk.CTkFrame(self, fg_color="#2d2d44", corner_radius=10)
         self.search_frame.grid(row=2, column=0, sticky="ew", padx=20, pady=10)
-
-        # 搜索框样式
         entry_style = {
-            "fg_color": "#3e3e5b",
-            "border_width": 0,
-            "text_color": "white",
-            "placeholder_text_color": "gray"
+            "fg_color": "#3e3e5b", "border_width": 0,
+            "text_color": "white", "placeholder_text_color": "gray"
         }
+        self.search_entry = ctk.CTkEntry(self.search_frame, placeholder_text="关键词搜索", **entry_style)
+        self.min_price_entry = ctk.CTkEntry(self.search_frame, placeholder_text="最低价格", width=100, **entry_style)
+        self.max_price_entry = ctk.CTkEntry(self.search_frame, placeholder_text="最高价格", width=100, **entry_style)
+        for w in (self.search_entry, self.min_price_entry, self.max_price_entry):
+            w.pack(side="left", padx=5, fill="x", expand=(w is self.search_entry))
+            w.bind("<Return>", lambda e: self.refresh_sneaker_list())
+        small_btn = {"fg_color": "#3e3e5b", "hover_color": "#4c4c70", "text_color": "white", "height": 34}
+        ctk.CTkButton(self.search_frame, text="搜索", **small_btn, command=self.refresh_sneaker_list).pack(side="left", padx=5)
+        ctk.CTkButton(self.search_frame, text="清除", **small_btn, command=self.clear_search).pack(side="left", padx=5)
 
-        self.search_entry = ctk.CTkEntry(
-            self.search_frame,
-            placeholder_text="关键词搜索",
-            **entry_style
-        )
-        self.search_entry.pack(side="left", padx=5, fill="x", expand=True)
-        self.search_entry.bind("<Return>", lambda e: self.refresh_sneaker_list())
-
-        self.min_price_entry = ctk.CTkEntry(
-            self.search_frame,
-            placeholder_text="最低价格",
-            width=100,
-            **entry_style
-        )
-        self.min_price_entry.pack(side="left", padx=5)
-        self.min_price_entry.bind("<Return>", lambda e: self.refresh_sneaker_list())
-
-        self.max_price_entry = ctk.CTkEntry(
-            self.search_frame,
-            placeholder_text="最高价格",
-            width=100,
-            **entry_style
-        )
-        self.max_price_entry.pack(side="left", padx=5)
-        self.max_price_entry.bind("<Return>", lambda e: self.refresh_sneaker_list())
-
-        # 按钮样式
-        button_style_small = {
-            "fg_color": "#3e3e5b",
-            "hover_color": "#4c4c70",
-            "text_color": "white",
-            "height": 34
-        }
-
-        self.search_button = ctk.CTkButton(
-            self.search_frame,
-            text="搜索",
-            **button_style_small,
-            command=self.refresh_sneaker_list
-        )
-        self.search_button.pack(side="left", padx=5)
-
-        self.clear_button = ctk.CTkButton(
-            self.search_frame,
-            text="清除搜索",
-            **button_style_small,
-            command=self.clear_search
-        )
-        self.clear_button.pack(side="left", padx=5)
-
-        # 第四行 展示区域
+        # === 第四行：列表 & 鞋墙容器 ===
+        # 列表视图
         self.listbox_frame = ctk.CTkFrame(self, fg_color="transparent")
         self.list_canvas = tk.Canvas(self.listbox_frame, bg="#1e1e2d", highlightthickness=0)
         self.scrollbar = tk.Scrollbar(self.listbox_frame, orient="vertical", command=self.list_canvas.yview)
         self.list_container = ctk.CTkFrame(self.list_canvas, fg_color="transparent")
-
-        self.list_container.bind(
-            "<Configure>", lambda e: self.list_canvas.configure(scrollregion=self.list_canvas.bbox("all"))
-        )
-
-        self.list_canvas.create_window((0, 0), window=self.list_container, anchor="nw")
+        self.list_container.bind("<Configure>", lambda e: self.list_canvas.configure(scrollregion=self.list_canvas.bbox("all")))
+        self.list_canvas.create_window((0,0), window=self.list_container, anchor="nw")
         self.list_canvas.configure(yscrollcommand=self.scrollbar.set)
-
         self.list_canvas.pack(side="left", fill="both", expand=True)
         self.scrollbar.pack(side="right", fill="y")
 
@@ -175,17 +103,11 @@ class SneakerMainPage(ctk.CTkFrame):
         self.wall_canvas = tk.Canvas(self, bg="#1e1e2d", highlightthickness=0)
         self.wall_scrollbar = tk.Scrollbar(self, orient="vertical", command=self.wall_canvas.yview)
         self.wall_container = ctk.CTkFrame(self.wall_canvas, fg_color="transparent")
-
-        self.wall_container.bind(
-            "<Configure>", lambda e: self.wall_canvas.configure(scrollregion=self.wall_canvas.bbox("all"))
-        )
-
-        self.wall_canvas.create_window((0, 0), window=self.wall_container, anchor="nw")
+        self.wall_container.bind("<Configure>", lambda e: self.wall_canvas.configure(scrollregion=self.wall_canvas.bbox("all")))
+        self.wall_canvas.create_window((0,0), window=self.wall_container, anchor="nw")
         self.wall_canvas.configure(yscrollcommand=self.wall_scrollbar.set)
 
-        self.wall_background = None
-        self.current_view = "list"
-
+        # 初始加载
         self.refresh_sneaker_list()
 
     def open_sneaker_form(self, sneaker=None):
@@ -193,97 +115,79 @@ class SneakerMainPage(ctk.CTkFrame):
         form.title("新增球鞋" if sneaker is None else "修改球鞋")
         form.geometry("400x450")
         form.grab_set()
+        form.grid_columnconfigure(1, weight=1)
 
-        # 1. 普通字段
+        # 定义字段
         fields = ["名称", "品牌", "系列", "购入日期", "购入价格", "尺码", "颜色"]
         entries = {}
+        var_brand = tk.StringVar(value=(sneaker.brand if sneaker else BRAND_OPTIONS[0]))
+
+        # 依次创建
         for idx, field in enumerate(fields):
-            lbl = ctk.CTkLabel(form, text=field)
-            lbl.grid(row=idx, column=0, padx=5, pady=5, sticky="w")
-            ent = ctk.CTkEntry(form)
-            ent.grid(row=idx, column=1, padx=5, pady=5, sticky="ew")
-            entries[field] = ent
+            ctk.CTkLabel(form, text=field).grid(row=idx, column=0, sticky="w", padx=5, pady=5)
+            if field == "品牌":
+                # 下拉选择品牌
+                ctk.CTkOptionMenu(form, values=BRAND_OPTIONS, variable=var_brand).grid(row=idx, column=1, sticky="ew", padx=5, pady=5)
+            else:
+                ent = ctk.CTkEntry(form)
+                ent.grid(row=idx, column=1, sticky="ew", padx=5, pady=5)
+                # 编辑模式下预填
+                if sneaker:
+                    val = getattr(sneaker, {
+                        "名称":"name","系列":"series","购入日期":"purchase_date",
+                        "购入价格":"purchase_price","尺码":"size","颜色":"color"
+                    }[field])
+                    ent.insert(0, str(val) if val is not None else "")
+                entries[field] = ent
 
-        # 2. 如果是编辑，预填数据
-        image_paths = []
-        if sneaker:
-            entries["名称"].insert(0, sneaker.name)
-            entries["品牌"].insert(0, sneaker.brand)
-            entries["系列"].insert(0, sneaker.series)
-            entries["购入日期"].insert(0, sneaker.purchase_date)
-            entries["购入价格"].insert(0, str(sneaker.purchase_price))
-            entries["尺码"].insert(0, str(sneaker.size))
-            entries["颜色"].insert(0, sneaker.color)
-            image_paths = sneaker.image_path.split(";") if sneaker.image_path else []
-
-        # 3. 状态下拉，用局部变量，不是 self.status_var
+        # “使用状态”下拉
         status_var = ctk.StringVar(value=(sneaker.status if sneaker else "使用中"))
-        ctk.CTkLabel(form, text="使用状态").grid(row=len(fields), column=0, padx=5, pady=5, sticky="w")
-        status_menu = ctk.CTkOptionMenu(
+        ctk.CTkLabel(form, text="使用状态").grid(row=len(fields), column=0, sticky="w", padx=5, pady=5)
+        ctk.CTkOptionMenu(
             form,
-            values=["收藏中", "使用中", "修复中", "闲置中", "售卖中", "已卖出"],
+            values=["收藏中", "使用中", "修复中", "闲置中", "挂卖中", "已卖出"],
             variable=status_var
-        )
-        status_menu.grid(row=len(fields), column=1, padx=5, pady=5, sticky="ew")
+        ).grid(row=len(fields), column=1, sticky="ew", padx=5, pady=5)
 
-        # 4. 图片上传
+        # 图片上传按钮
+        image_paths = sneaker.image_path.split(";") if sneaker and sneaker.image_path else []
         def upload_images():
-            paths = filedialog.askopenfilenames(
-                title="选择图片",
-                filetypes=[("Image Files", "*.png;*.jpg;*.jpeg")]
-            )
+            paths = filedialog.askopenfilenames(filetypes=[("Image Files","*.png;*.jpg;*.jpeg")])
             if paths:
                 image_paths.clear()
                 image_paths.extend(paths)
+        ctk.CTkButton(form, text="上传图片", command=upload_images).grid(
+            row=len(fields)+1, column=0, columnspan=2, pady=5
+        )
 
-        up_btn = ctk.CTkButton(form, text="上传图片", command=upload_images)
-        up_btn.grid(row=len(fields) + 1, column=0, columnspan=2, pady=5)
-
-        # 5. 保存按钮及逻辑
+        # 保存逻辑
         def save():
             try:
                 with get_db() as db:
+                    data = {
+                        "name": entries["名称"].get().strip(),
+                        "brand": var_brand.get(),
+                        "series": entries["系列"].get().strip(),
+                        "purchase_date": entries["购入日期"].get().strip(),
+                        "purchase_price": float(entries["购入价格"].get()),
+                        "size": float(entries["尺码"].get()),
+                        "color": entries["颜色"].get().strip(),
+                        "status": status_var.get(),
+                        "image_path": ";".join(image_paths)
+                    }
                     if sneaker:
-                        # 1) 取出一个 update_data 字典，包含所有字段
-                        update_data = {
-                            "name": entries["名称"].get(),
-                            "brand": entries["品牌"].get(),
-                            "series": entries["系列"].get(),
-                            "purchase_date": entries["购入日期"].get(),
-                            "purchase_price": float(entries["购入价格"].get()),
-                            "size": float(entries["尺码"].get()),
-                            "color": entries["颜色"].get(),
-                            "image_path": ";".join(image_paths),
-                            "status": status_var.get()  # 一定要把状态也传进去
-                        }
-                        # 2) 用仓库层 update 接口
-                        SneakerRepository.update(db, sneaker.id, update_data)
-
+                        SneakerRepository.update(db, sneaker.id, data)
                     else:
-                        # 新增分支不变
-                        new_data = {
-                            "name": entries["名称"].get(),
-                            "brand": entries["品牌"].get(),
-                            "series": entries["系列"].get(),
-                            "purchase_date": entries["购入日期"].get(),
-                            "purchase_price": float(entries["购入价格"].get()),
-                            "size": float(entries["尺码"].get()),
-                            "color": entries["颜色"].get(),
-                            "image_path": ";".join(image_paths),
-                            "status": status_var.get()  # 新增也可以写明状态
-                        }
-                        SneakerRepository.create(db, new_data)
-
-                # 3) 全部保存成功后刷新 UI
+                        SneakerRepository.create(db, data)
                 messagebox.showinfo("成功", "保存成功！")
                 form.destroy()
                 self.refresh_sneaker_list()
-
             except Exception as e:
                 messagebox.showerror("错误", f"保存失败：{e}")
 
-        save_btn = ctk.CTkButton(form, text="保存", command=save)
-        save_btn.grid(row=len(fields) + 2, column=0, columnspan=2, pady=15)
+        ctk.CTkButton(form, text="保存", command=save).grid(
+            row=len(fields)+2, column=0, columnspan=2, pady=15
+        )
 
         # 让第二列可以拉伸
         form.grid_columnconfigure(1, weight=1)

@@ -1,6 +1,6 @@
 # sneaker_manager/app/repositories/sneaker_repository.py
 from sqlalchemy.orm import Session, joinedload
-from ..models import Sneaker, Rating
+from ..models import Sneaker, Rating, UsageRecord
 
 
 class SneakerRepository:
@@ -29,6 +29,9 @@ class SneakerRepository:
 
     @staticmethod
     def delete(db: Session, sneaker_id: int):
+        # 1) 先删掉所有这个鞋子的使用记录
+        db.query(UsageRecord).filter(UsageRecord.sneaker_id == sneaker_id).delete(synchronize_session=False)
+        # 2) 再删鞋子本身
         sneaker = db.query(Sneaker).filter(Sneaker.id == sneaker_id).first()
         if sneaker:
             db.delete(sneaker)
