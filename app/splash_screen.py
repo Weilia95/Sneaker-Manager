@@ -13,7 +13,7 @@ class SplashScreen:
         self.splash.overrideredirect(True)  # 无边框
 
         # 加载图片
-        self.bg_image = ctk.CTkImage(Image.open(self.image_path), size=(977, 783))
+        self.bg_image = ctk.CTkImage(Image.open(self.image_path), size=(1764, 1036))
         self.bg_label = ctk.CTkLabel(self.splash, image=self.bg_image, text="")
         self.bg_label.pack()
 

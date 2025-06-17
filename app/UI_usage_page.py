@@ -161,8 +161,9 @@ class UsagePage(ctk.CTkFrame):
             for r in records:
                 lines.append(
                     f"✔ {r['sneaker']}（{r['activity']}）\n"
-                    f"   地点：{r['location'] or '无'}  时长：{r['duration']} 分钟\n"
-                    f"   备注：{r['notes'] or '无'}"
+                    f"   地点：{r['location'] or '未记录'}\n"
+                    f"   时长: {r['duration']}分钟\n"
+                    f"   备注：{r['notes'] or ' '}"
                 )
             self.details_label.configure(text=f"{date_str} 穿鞋记录：\n\n" + "\n\n".join(lines))
 

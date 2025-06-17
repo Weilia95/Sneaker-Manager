@@ -4,11 +4,11 @@
 
 
 ---
-app version: v0.45
+app version: v0.453
 
 latest brief: demo阶段，正在完善使用记录及球鞋评分功能, 及优化UI
 
-last updated on: 2025/6/15
+last updated on: 2025/6/17
 
 ## ❤️ 诞生故事
 

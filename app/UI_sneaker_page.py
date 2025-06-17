@@ -15,6 +15,11 @@ BRAND_OPTIONS = [
     "昂跑", "斯凯奇", "Salomon", "凯乐石", "其他"
 ]
 
+SHOE_TYPES = [
+    "竞速跑鞋","慢跑鞋","休闲鞋","篮球鞋","足球鞋","旅游鞋", "篮球文化鞋","羽毛球鞋","乒乓球鞋","越野鞋","滑板鞋",
+    "五指鞋","溯溪鞋","高尔夫球鞋","拖鞋","其他"
+]
+
 class SneakerMainPage(ctk.CTkFrame):
     def __init__(self, master, sneaker_service, **kwargs):
         super().__init__(master, **kwargs)
@@ -54,10 +59,10 @@ class SneakerMainPage(ctk.CTkFrame):
             "width": 40, "height": 40, "corner_radius": 20,
             "fg_color": "#3e3e5b", "hover_color": "#4c4c70", "text_color": "white"
         }
-        ctk.CTkButton(button_frame, text="⇄", **btn_style, command=self.switch_view).pack(side="right", padx=5)
-        ctk.CTkButton(button_frame, text="🗑", **btn_style, command=self.delete_sneaker).pack(side="right", padx=5)
-        ctk.CTkButton(button_frame, text="✎", **btn_style, command=self.edit_sneaker).pack(side="right", padx=5)
-        ctk.CTkButton(button_frame, text="+", **btn_style, command=lambda: self.open_sneaker_form()).pack(side="right", padx=5)
+        ctk.CTkButton(button_frame, text="⇄切换视图", **btn_style, command=self.switch_view).pack(side="right", padx=5)
+        ctk.CTkButton(button_frame, text="🗑删除", **btn_style, command=self.delete_sneaker).pack(side="right", padx=5)
+        ctk.CTkButton(button_frame, text="✎修改", **btn_style, command=self.edit_sneaker).pack(side="right", padx=5)
+        ctk.CTkButton(button_frame, text="+新增", **btn_style, command=lambda: self.open_sneaker_form()).pack(side="right", padx=5)
 
         # === 第二行：统计信息 ===
         self.stats_frame = ctk.CTkFrame(self, fg_color="#2d2d44", corner_radius=10)
