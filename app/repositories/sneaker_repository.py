@@ -40,13 +40,34 @@ class SneakerRepository:
         return False
 
     @staticmethod
-    def add_rating(db: Session, sneaker_id, cushion, traction, torsion, durability):
+    def add_rating(db: Session,
+                   sneaker_id: int,
+                   cushion: int,
+                   traction: int,
+                   torsion: int,
+                   durability: int,
+                   wrap: str = None,
+                   anti_roll: int = None,
+                   weight: int = None,
+                   comfort: int = None,
+                   width: str = None,
+                   inner_length: str = None,
+                   insole: str = None,
+                   depth: str = None):
         rating = Rating(
-            sneaker_id=sneaker_id,
-            cushion=cushion,
-            traction=traction,
-            torsion=torsion,
-            durability=durability
+            sneaker_id   = sneaker_id,
+            cushion      = cushion,
+            traction     = traction,
+            torsion      = torsion,
+            durability   = durability,
+            wrap         = wrap,
+            anti_roll    = anti_roll,
+            weight       = weight,
+            comfort      = comfort,
+            width        = width,
+            inner_length = inner_length,
+            insole       = insole,
+            depth        = depth
         )
         db.add(rating)
         db.commit()
