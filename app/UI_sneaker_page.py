@@ -15,11 +15,6 @@ BRAND_OPTIONS = [
     "昂跑", "斯凯奇", "Salomon", "凯乐石", "其他"
 ]
 
-SHOE_TYPES = [
-    "竞速跑鞋","慢跑鞋","休闲鞋","篮球鞋","足球鞋","旅游鞋", "篮球文化鞋","羽毛球鞋","乒乓球鞋","越野鞋","滑板鞋",
-    "五指鞋","溯溪鞋","高尔夫球鞋","拖鞋","其他"
-]
-
 class SneakerMainPage(ctk.CTkFrame):
     def __init__(self, master, sneaker_service, **kwargs):
         super().__init__(master, **kwargs)
@@ -118,7 +113,7 @@ class SneakerMainPage(ctk.CTkFrame):
     def open_sneaker_form(self, sneaker=None):
         form = ctk.CTkToplevel(self)
         form.title("新增球鞋" if sneaker is None else "修改球鞋")
-        form.geometry("400x450")
+        form.geometry("400x550")
         form.grab_set()
         form.grid_columnconfigure(1, weight=1)
 
@@ -154,6 +149,49 @@ class SneakerMainPage(ctk.CTkFrame):
             variable=status_var
         ).grid(row=len(fields), column=1, sticky="ew", padx=5, pady=5)
 
+        # 只有编辑时显示下面五项
+        if sneaker:
+            extra_start = 8
+            # 货号
+            item_var = ctk.CTkEntry(form)
+            ctk.CTkLabel(form, text="货号").grid(row=len(fields) + 1, column=0, sticky="w", padx=5, pady=5)
+            item_var.grid(row=len(fields) + 1, column=1, padx=5, pady=5, sticky="ew")
+            item_var.insert(0, sneaker.item_number or "")
+
+            # 新旧
+            cond_var = ctk.StringVar(value=sneaker.condition or "全新")
+            ctk.CTkLabel(form, text="新旧").grid(row=len(fields) + 2, column=0, sticky="w", padx=5, pady=5)
+            ctk.CTkOptionMenu(
+                form, values=["全新", "二手"], variable=cond_var
+            ).grid(row=len(fields) + 2, column=1, padx=5, pady=5, sticky="ew")
+
+            # 是否有鞋盒
+            box_var = ctk.StringVar(value=sneaker.has_box or "是")
+            ctk.CTkLabel(form, text="有鞋盒").grid(row=len(fields) + 3, column=0, sticky="w", padx=5, pady=5)
+            ctk.CTkOptionMenu(
+                form, values=["是", "否"], variable=box_var
+            ).grid(row=len(fields) + 3, column=1, padx=5, pady=5, sticky="ew")
+
+            # 是否实战
+            act_var = ctk.StringVar(value=sneaker.actual or "是")
+            ctk.CTkLabel(form, text="实战鞋").grid(row=len(fields) + 4, column=0, sticky="w", padx=5, pady=5)
+            ctk.CTkOptionMenu(
+                form, values=["是", "否"], variable=act_var
+            ).grid(row=len(fields) + 4, column=1, padx=5, pady=5, sticky="ew")
+
+            # 类型
+            type_var = ctk.StringVar(value=sneaker.shoe_type or "篮球鞋")
+            types = ["竞速跑鞋", "慢跑鞋", "休闲鞋", "篮球鞋", "足球鞋", "旅游鞋",
+                     "篮球文化鞋", "羽毛球鞋", "乒乓球鞋", "越野鞋", "滑板鞋", "五指鞋",
+                     "溯溪鞋", "高尔夫球鞋", "拖鞋", "其他"]
+            ctk.CTkLabel(form, text="类型").grid(row=len(fields) + 5, column=0, sticky="w", padx=5, pady=5)
+            ctk.CTkOptionMenu(
+                form, values=types, variable=type_var).grid(row=len(fields) + 5, column=1, padx=5, pady=5, sticky="ew")
+
+            bottom_row = extra_start + 5
+        else:
+            bottom_row = 8  # 新增模式时，直接在状态下一行放按钮
+
         # 图片上传按钮
         image_paths = sneaker.image_path.split(";") if sneaker and sneaker.image_path else []
         def upload_images():
@@ -181,6 +219,14 @@ class SneakerMainPage(ctk.CTkFrame):
                         "image_path": ";".join(image_paths)
                     }
                     if sneaker:
+                        # 编辑时写入新增五项
+                        data.update({
+                            "item_number": item_var.get(),
+                            "condition": cond_var.get(),
+                            "has_box": box_var.get(),
+                            "actual": act_var.get(),
+                            "shoe_type": type_var.get()
+                        })
                         SneakerRepository.update(db, sneaker.id, data)
                     else:
                         SneakerRepository.create(db, data)
@@ -198,6 +244,7 @@ class SneakerMainPage(ctk.CTkFrame):
         form.grid_columnconfigure(1, weight=1)
 
     def create_sneaker_card(self, sneaker):
+        # 卡片容器
         card = ctk.CTkFrame(
             self.list_container,
             height=170,
@@ -211,86 +258,89 @@ class SneakerMainPage(ctk.CTkFrame):
         card.bind("<Enter>", lambda e, c=card: c.configure(fg_color="#3e3e5b"))
         card.bind("<Leave>", lambda e, c=card: c.configure(fg_color="#2d2d44"))
 
-        # 图片容器
+        # 图片区域：改为 grid 布局
         img_frame = ctk.CTkFrame(card, fg_color="transparent", width=150)
-        img_frame.pack(side="left", padx=10, pady=10)
-
+        # pack 改为 grid
+        img_frame.grid(row=0, column=0, rowspan=2, padx=10, pady=10, sticky="nw")
         images = sneaker.image_path.split(';') if sneaker.image_path else []
         self.current_image_index[sneaker.id] = 0
-
         if images and os.path.exists(images[0]):
             try:
-                image = Image.open(images[0])
-                image = image.resize((120, 120))
-                photo = ImageTk.PhotoImage(image)
-                img_label = tk.Label(img_frame, image=photo, bg="#2d2d44")
-                img_label.image = photo
-                img_label.pack()
-
+                img = Image.open(images[0]).resize((120, 120))
+                photo = ImageTk.PhotoImage(img)
+                lbl = tk.Label(img_frame, image=photo, bg="#2d2d44")
+                lbl.image = photo
+                lbl.pack()
                 if len(images) > 1:
-                    next_button = ctk.CTkButton(
+                    ctk.CTkButton(
                         img_frame, text=">", width=30, height=30, corner_radius=15,
                         fg_color="#3e3e5b", hover_color="#4c4c70", text_color="white",
-                        command=lambda s=sneaker, l=img_label: self.show_next_image(s, l)
-                    )
-                    next_button.pack(pady=5)
+                        command=lambda s=sneaker, l=lbl: self.show_next_image(s, l)
+                    ).pack(pady=5)
             except Exception as e:
-                print(f"Error loading image: {e}")
-                img_label = tk.Label(img_frame, text="图片加载失败", width=15, height=7, bg="#2d2d44", fg="white")
-                img_label.pack()
+                print("图片加载失败：", e)
         else:
-            img_label = tk.Label(img_frame, text="无图片", width=15, height=7, bg="#2d2d44", fg="white")
-            img_label.pack()
+            tk.Label(img_frame, text="无图片", width=15, height=7, bg="#2d2d44", fg="white").pack()
 
-        # 信息区域 - 两列显示
+        # 信息区域：单个容器，用 grid
         info_frame = ctk.CTkFrame(card, fg_color="transparent")
-        info_frame.pack(side="left", fill="both", expand=True, padx=10, pady=10)
+        info_frame.grid(row=0, column=1, padx=5, pady=5, sticky="nw")
 
-        days_owned = self.calculate_days(sneaker.purchase_date)
-
-        # 名称行
-        name_frame = ctk.CTkFrame(info_frame, fg_color="transparent")
-        name_frame.pack(fill="x", pady=(0, 5))
-
-        ctk.CTkLabel(
-            name_frame,
+        # 第一行：名称（左）+ 价格（右）
+        name_lbl = ctk.CTkLabel(
+            info_frame,
             text=sneaker.name,
-            font=("微软雅黑", 16, "bold"),
+            font=("微软雅黑", 18, "bold"),  # 字体放大加粗
             text_color="#f0f0f0"
-        ).pack(side="left")
+        )
+        name_lbl.grid(
+            row=0, column=0,
+            sticky="w",
+            padx=(6, 0),  # 向右移一点
+            pady=(5, 2)
+        )
 
-        ctk.CTkLabel(
-            name_frame,
+        price_lbl = ctk.CTkLabel(
+            info_frame,
             text=f"¥{sneaker.purchase_price}",
-            font=("微软雅黑", 14),
-            text_color="#FFD700"  # 金色显示价格
-        ).pack(side="right", padx=10)
+            font=("微软雅黑", 18, "bold"),  # 字体放大加粗
+            text_color="#FFD700"
+        )
+        price_lbl.grid(
+            row=0, column=3,
+            sticky="e",
+            padx=(0, 22),  # 向左移一点
+            pady=(5, 2)
+        )
 
-        # 信息两列排布
-        details = [
+        # 配置 4 列平分宽度
+        for col in range(4):
+            info_frame.grid_columnconfigure(col, weight=1, uniform="col")
+
+        # 后续 11 条属性
+        days_owned = self.calculate_days(sneaker.purchase_date)
+        attrs = [
             f"品牌: {sneaker.brand}",
             f"系列: {sneaker.series}",
             f"尺码: {sneaker.size}",
             f"颜色: {sneaker.color}",
+            f"状态: {sneaker.status}",
+            f"新旧: {getattr(sneaker, 'condition', '')}",
+            f"鞋盒: {getattr(sneaker, 'has_box', '')}",
+            f"实战: {getattr(sneaker, 'actual', '')}",
+            f"类型: {getattr(sneaker, 'shoe_type', '')}",
+            f"货号: {sneaker.item_number or ''}",
             f"已拥有: {days_owned}天",
-            f"状态: {sneaker.status}"
         ]
-
-        left_column = ctk.CTkFrame(info_frame, fg_color="transparent")
-        left_column.pack(side="left", padx=10, fill="y")
-
-        right_column = ctk.CTkFrame(info_frame, fg_color="transparent")
-        right_column.pack(side="left", padx=10, fill="y")
-
-        # 拆分到左右列
-        for idx, detail in enumerate(details):
-            target = left_column if idx % 2 == 0 else right_column
-            ctk.CTkLabel(
-                target,
-                text=detail,
-                font=("微软雅黑", 12),
-                text_color="#c0c0c0"
-            ).pack(anchor="w", pady=2)
+        # 放到 3×4 的网格里，最后一个空位自然留白
+        for idx, text in enumerate(attrs):
+            r = 1 + idx // 4  # 从第 1 行开始
+            c = idx % 4
+            lbl = ctk.CTkLabel(info_frame,
+                               text=text,
+                               font=("微软雅黑", 12),
+                               text_color="#c0c0c0")
+            lbl.grid(row=r, column=c, sticky="w", padx=5, pady=(2, 0))
 
     def edit_sneaker(self):
         if self.selected_sneaker:

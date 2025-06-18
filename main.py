@@ -1,3 +1,4 @@
+
 from app.database import init_db
 import customtkinter as ctk
 from app.splash_screen import SplashScreen
