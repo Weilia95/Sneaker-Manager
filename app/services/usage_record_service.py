@@ -10,15 +10,19 @@ from pyecharts import options as opts
 def add_usage_records(records: list[dict]):
     try:
         with get_db() as db:
-            usage_objects = [UsageRecord(
-                sneaker_id=r["sneaker_id"],
-                date=datetime.strptime(r["date"], "%Y-%m-%d").date(),
-                activity=r["activity"],
-                location=r["location"],
-                duration=int(r["duration"]) if r["duration"] else 0,
-                notes=r["notes"]) for r in records]
-
-            db.add_all(usage_objects)
+            objs = []
+            for r in records:
+                paths = ";".join(r.get("image_paths", []))
+                objs.append(UsageRecord(
+                    sneaker_id=r["sneaker_id"],
+                    date=datetime.strptime(r["date"], "%Y-%m-%d").date(),
+                    activity=r["activity"],
+                    location=r["location"],
+                    duration=int(r["duration"]) if r["duration"] else 0,
+                    notes=r["notes"],
+                    image_paths=paths
+                ))
+            db.add_all(objs)
             db.commit()
 
     except Exception as e:
@@ -140,13 +144,13 @@ def render_usage_frequency_chart(data):
 
 def get_usage_records_by_date(date_str: str):
     """
-    获取某一天的所有穿鞋记录（含球鞋名称）
-    输入: "2025-06-01"
-    返回: List[{"sneaker": "AJ1 Chicago", "activity": "穿着通勤"}]
+    获取某一天的所有穿鞋记录（含球鞋名称、照片路径列表）
     """
+    from datetime import datetime
+    from app.models import UsageRecord, Sneaker
+    from app.database import get_db
     with get_db() as db:
         target_date = datetime.strptime(date_str, "%Y-%m-%d").date()
-
         results = (
             db.query(UsageRecord, Sneaker)
             .join(Sneaker, Sneaker.id == UsageRecord.sneaker_id)
@@ -154,16 +158,21 @@ def get_usage_records_by_date(date_str: str):
             .all()
         )
 
-        return [
-            {
-                "sneaker": r.Sneaker.name,
-                "activity": r.UsageRecord.activity,
-                "location": r.UsageRecord.location,
-                "duration": r.UsageRecord.duration,
-                "notes": r.UsageRecord.notes,
-            }
-            for r in results
-        ]
+    records = []
+    for usage, sneaker in results:
+        paths = []
+        if usage.image_paths:  # 假设在 model 上你已经给 UsageRecord 增加了 image_paths: Text
+            paths = usage.image_paths.split(';')
+        records.append({
+            "id": usage.id,
+            "sneaker": sneaker.name,
+            "activity": usage.activity,
+            "location": usage.location,
+            "duration": usage.duration,
+            "notes": usage.notes,
+            "image_paths": paths
+        })
+    return records
 
 
 def delete_records_by_date(date_str):
