@@ -9,11 +9,11 @@ if __name__ == "__main__":
     init_db()
 
     # 在任何 CTk 窗口创建之前，先禁用自动 DPI 识别
-    ctk.deactivate_automatic_dpi_awareness()
+    #ctk.deactivate_automatic_dpi_awareness()
 
     # （可选）锁定为 100% 缩放，防止你自己设置 widget/window_scaling 也被 DPI 打断
-    ctk.set_widget_scaling(1.0)
-    ctk.set_window_scaling(1.0)
+    #ctk.set_widget_scaling(1.0)
+    #ctk.set_window_scaling(1.0)
 
     # 初始化主题
     ctk.set_appearance_mode("light")

@@ -364,13 +364,31 @@ class SneakerMainPage(ctk.CTkFrame):
         self.active_frame = self.listbox_frame
 
     def show_wall_view(self):
+        # 先把旧的 active_frame 隐藏掉
         if self.active_frame:
             self.active_frame.grid_forget()
 
+        # 把 wall_canvas 和 scrollbar 摆上来
         self.wall_canvas.grid(row=3, column=0, sticky="nsew", padx=20, pady=10)
         self.wall_scrollbar.grid(row=3, column=0, sticky="nse")
         self.active_frame = self.wall_canvas
-        self.render_wall_view()
+
+        # 清空掉之前渲染的内容
+        for widget in self.wall_container.winfo_children():
+            widget.destroy()
+
+        # 如果没有任何筛选后球鞋，直接显示提示
+        if not getattr(self, "filtered_sneakers", []):
+            no_label = ctk.CTkLabel(
+                self.wall_container,
+                text="还没有球鞋呢，快去添加一双吧~",
+                font=("微软雅黑", 16, "bold"),
+                text_color="#c0c0c0"
+            )
+            no_label.pack(expand=True, pady=40)
+        else:
+            # 否则正常渲染鞋墙
+            self.render_wall_view()
 
     def render_wall_view(self):
         for widget in self.wall_container.winfo_children():
@@ -480,21 +498,41 @@ class SneakerMainPage(ctk.CTkFrame):
             messagebox.showwarning("警告", "请先选中一双球鞋")
 
     def refresh_sneaker_list(self):
+        # 先把列表视图 grid 出来（即使里面是空的也要显示框架）
+        self.current_view = "list"
+        self.show_list_view()
+
+        # 清空旧内容
         for widget in self.list_container.winfo_children():
             widget.destroy()
 
-        self.selected_sneaker = None
-        self.selected_card = None
-
+        # 读取所有球鞋
         with get_db() as db:
-            self.sneakers = SneakerRepository.get_all(db)
+            all_sneakers = SneakerRepository.get_all(db)
 
+        # 如果一双都没有，直接在列表容器中显示提示
+        if not all_sneakers:
+            no_label = ctk.CTkLabel(
+                self.list_container,
+                text="还没有球鞋呢，快去添加一双吧~",
+                font=("微软雅黑", 16, "bold"),
+                text_color="#c0c0c0"
+            )
+            no_label.pack(expand=True, pady=40)
+
+            # 统计也同步清空/重置
+            self.total_label.configure(text="总球鞋数: 0")
+            self.total_value_label.configure(text="总价值: 0元")
+            self.average_value_label.configure(text="平均价值: 0元")
+            return
+
+        # 否则照常过滤、更新统计、渲染卡片
         keyword = self.search_entry.get().lower()
         min_price = self.min_price_entry.get()
         max_price = self.max_price_entry.get()
 
-        self.filtered_sneakers = []  # 关键：存储筛选结果
-        for s in self.sneakers:
+        self.filtered_sneakers = []
+        for s in all_sneakers:
             if keyword and keyword not in s.name.lower():
                 continue
             if min_price and s.purchase_price < float(min_price):
@@ -503,18 +541,17 @@ class SneakerMainPage(ctk.CTkFrame):
                 continue
             self.filtered_sneakers.append(s)
 
-        # 更新统计卡
-        self.total_label.configure(text=f"总球鞋数: {len(self.filtered_sneakers)}")
-        total_value = sum([s.purchase_price for s in self.filtered_sneakers])
-        avg_value = total_value / len(self.filtered_sneakers) if self.filtered_sneakers else 0
+        count = len(self.filtered_sneakers)
+        total_value = sum(s.purchase_price for s in self.filtered_sneakers)
+        avg_value = total_value / count if count else 0
+        self.total_label.configure(text=f"总球鞋数: {count}")
         self.total_value_label.configure(text=f"总价值: {total_value}元")
         self.average_value_label.configure(text=f"平均价值: {avg_value:.2f}元")
 
-        # 渲染列表 or 鞋墙
+        # 渲染列表或鞋墙
         if self.current_view == "list":
             for sneaker in self.filtered_sneakers:
                 self.create_sneaker_card(sneaker)
-            self.show_list_view()
         else:
             self.show_wall_view()
 

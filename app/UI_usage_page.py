@@ -18,6 +18,19 @@ class UsagePage(ctk.CTkFrame):
         super().__init__(master, **kwargs)
         self.configure(fg_color="#1e1e2d")  # 深色背景
 
+        # —— 检查是否有任何球鞋 ——
+        with get_db() as db:
+            from app.repositories.sneaker_repository import SneakerRepository
+            sneakers = SneakerRepository.get_all(db)
+        if not sneakers:
+            ctk.CTkLabel(
+                self,
+                text="还没有球鞋呢，快去添加一双吧~",
+                font=("微软雅黑", 16, "bold"),
+                text_color="#c0c0c0"
+            ).pack(expand=True, pady=40)
+            return
+
         # Grid: row0=title, row1=calendar+details (60%), row2=stats cards (40%)
         self.grid_rowconfigure(0, weight=0)
         self.grid_rowconfigure(1, weight=6)

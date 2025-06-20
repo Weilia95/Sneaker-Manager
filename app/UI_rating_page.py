@@ -15,6 +15,18 @@ class RatingPage(ctk.CTkFrame):
         self.header = ctk.CTkLabel(self, text="评分库", font=("微软雅黑", 20, "bold"), anchor="w")
         self.header.pack(fill="x", pady=(10,0), padx=10)
 
+        # —— 检查是否有任何球鞋 ——
+        with get_db() as db:
+            sneakers = SneakerRepository.get_all(db)
+        if not sneakers:
+            ctk.CTkLabel(
+                self,
+                text="还没有球鞋呢，快去添加一双吧~",
+                font=("微软雅黑", 16, "bold"),
+                text_color="#c0c0c0"
+            ).pack(expand=True, pady=40)
+            return
+
         # 排序菜单
         self.sort_var = ctk.StringVar(value="默认排序")
         sort_options = [
