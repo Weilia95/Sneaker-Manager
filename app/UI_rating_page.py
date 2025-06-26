@@ -1,228 +1,405 @@
 # app/UI_rating_page.py
+
 import tkinter as tk
 import customtkinter as ctk
 from tkinter import messagebox
-from app.repositories.sneaker_repository import SneakerRepository
 from app.database import get_db
-from app.services.rating_service import calculate_total_score, sort_by_total_score_desc, sort_by_total_score_asc, sort_by_dimension
-from app.models import Sneaker
+from app.repositories.sneaker_repository import SneakerRepository
+from app.services.rating_service import calculate_total_score
+from app.models import Sneaker, Rating
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+from matplotlib.figure import Figure
+import numpy as np
+from sqlalchemy.orm import joinedload
+from sqlalchemy.orm import joinedload
+from app.models import Rating, Sneaker
+from app.database import get_db
 
 class RatingPage(ctk.CTkFrame):
     def __init__(self, master, **kwargs):
         super().__init__(master, **kwargs)
+        self.configure(fg_color="#1e1e2d")
 
-        # 标题
-        self.header = ctk.CTkLabel(self, text="评分库", font=("微软雅黑", 20, "bold"), anchor="w")
-        self.header.pack(fill="x", pady=(10,0), padx=10)
+        # 顶部标题
+        ctk.CTkLabel(self, text="球鞋评分", font=("微软雅黑", 22, "bold"), text_color="white") \
+            .pack(anchor="w", padx=20, pady=(20, 5))
 
-        # —— 检查是否有任何球鞋 ——
-        with get_db() as db:
-            sneakers = SneakerRepository.get_all(db)
-        if not sneakers:
-            ctk.CTkLabel(
-                self,
-                text="还没有球鞋呢，快去添加一双吧~",
-                font=("微软雅黑", 16, "bold"),
-                text_color="#c0c0c0"
-            ).pack(expand=True, pady=40)
-            return
+        # 上半区：评分列表与排序
+        top_frame = ctk.CTkFrame(self, fg_color="#2d2d44", corner_radius=10)
+        top_frame.pack(fill="x", padx=20, pady=(0,10), ipady=5)
+        ctk.CTkLabel(top_frame, text="评分列表", font=("微软雅黑", 16, "bold"), text_color="white") \
+            .pack(side="left", padx=10)
 
-        # 排序菜单
         self.sort_var = ctk.StringVar(value="默认排序")
         sort_options = [
-            "默认排序",
-            "总分从高到低",
-            "总分从低到高",
-            "缓震从高到低",
-            "抓地从高到低",
-            "抗扭从高到低",
-            "耐磨从高到低",
-            "包裹从高到低",
-            "防侧翻从高到低",
-            "重量从高到低",
-            "舒适性从高到低"
+            "默认排序", "总分从高到低", "总分从低到高",
+            "缓震从高到低", "抓地从高到低", "抗扭从高到低", "耐磨从高到低",
+            "包裹从高到低", "防侧翻从高到低", "重量从高到低", "舒适性从高到低"
         ]
-        self.sort_menu = ctk.CTkOptionMenu(
-            self,
+        ctk.CTkOptionMenu(
+            top_frame,
             values=sort_options,
             variable=self.sort_var,
-            command=self.on_sort_change
+            command=self.on_sort_change,
+            fg_color="#3e3e5b",
+            button_color="#3e3e5b",
+            text_color="white",
+            dropdown_fg_color="#2d2d44",
+            dropdown_text_color="white"
+        ).pack(side="right", padx=10)
+
+        # 列表容器
+        self.list_container = ctk.CTkScrollableFrame(
+            self, fg_color="#2d2d44", corner_radius=10, height=260
         )
-        self.sort_menu.pack(pady=10, padx=10, anchor="w")
+        self.list_container.pack(fill="x", padx=20, pady=(0,20))
 
-        # 主内容区
-        self.content_frame = ctk.CTkFrame(self)
-        self.content_frame.pack(fill="both", expand=True, padx=10, pady=(0,10))
-
+        # 初始化数据
         self.sneakers = []
-        self.load_sneaker_rating_ui(self.content_frame)
+        self.selected_sneaker = None
+        self.selected_frame = None
+        self.load_sneakers()
 
-    def load_sneaker_rating_ui(self, parent_frame, sneakers=None):
-        # 清空旧内容
-        for w in parent_frame.winfo_children():
+        # 下半区：评分明细
+        ctk.CTkLabel(self, text="评分明细", font=("微软雅黑", 16, "bold"), text_color="white") \
+            .pack(anchor="w", padx=20, pady=(0,5))
+
+        self.detail_frame = ctk.CTkFrame(self, fg_color="#2d2d44", corner_radius=10)
+        self.detail_frame.pack(fill="both", expand=True, padx=20, pady=(0,20))
+
+        # 左：雷达图 60%
+        self.radar_container = ctk.CTkFrame(self.detail_frame, fg_color="transparent")
+        self.radar_container.place(relx=0, rely=0, relwidth=0.6, relheight=1)
+        # 右：文字详情 40%
+        self.text_container = ctk.CTkScrollableFrame(
+            self.detail_frame, fg_color="transparent", corner_radius=0
+        )
+        self.text_container.place(relx=0.6, rely=0, relwidth=0.4, relheight=1)
+
+    def load_sneakers(self):
+        """从 DB 拉取所有鞋、渲染列表"""
+        with get_db() as db:
+            self.sneakers = SneakerRepository.get_all(db)
+        # 清掉之前的选择
+        self.selected_sneaker = None
+        self.selected_frame = None
+        self.render_list()
+        # —— 安全清空明细区域 —— #
+        if hasattr(self, 'radar_container'):
+            for w in self.radar_container.winfo_children():
+                w.destroy()
+        if hasattr(self, 'text_container'):
+            for w in self.text_container.winfo_children():
+                w.destroy()
+
+    def render_list(self):
+        """上半区：评分列表"""
+        for w in self.list_container.winfo_children():
             w.destroy()
 
-        if sneakers is None:
-            with get_db() as db:
-                self.sneakers = SneakerRepository.get_all(db)
+        for sn in self.sneakers:
+            frame = ctk.CTkFrame(
+                self.list_container,
+                fg_color="#2d2d44", corner_radius=8,
+                border_width=2, border_color="#2d2d44"
+            )
+            frame.pack(fill="x", pady=4, padx=10)
+            frame.bind("<Button-1>", lambda e, s=sn, f=frame: self.on_select(s, f))
 
-        for sneaker in self.sneakers:
-            frame = ctk.CTkFrame(parent_frame, corner_radius=10, fg_color="#2d2d44")
-            frame.pack(fill="x", pady=5, padx=5)
+            # 左侧文字
+            total = calculate_total_score(sn.ratings)
+            txt = f"{sn.brand} - {sn.name}    总分：{total:.1f}" if total is not None else "暂无评分"
+            ctk.CTkLabel(frame, text=txt, font=("微软雅黑", 14), text_color="white")\
+                .pack(side="left", padx=10, pady=10)
 
-            total = calculate_total_score(sneaker.ratings)
-            score_text = f"{total:.1f}" if total is not None else "N/A"
+            # “评分”按钮
+            ctk.CTkButton(
+                frame, text="评分", width=80,
+                command=lambda s=sn: self.open_rating_window(s)
+            ).pack(side="right", padx=5, pady=5)
+            # “重置分数”按钮
+            ctk.CTkButton(
+                frame, text="重置分数", width=100,
+                command=lambda s=sn: self.reset_scores(s)
+            ).pack(side="right", padx=5, pady=5)
 
-            lbl = ctk.CTkLabel(frame, text=f"{sneaker.brand} – {sneaker.name}    总分：{score_text}", font=("微软雅黑", 14, "bold"))
-            lbl.pack(side="left", padx=10, pady=10)
-
-            btn = ctk.CTkButton(frame, text="评分", width=80, command=lambda s=sneaker: self.open_rating_window(s))
-            btn.pack(side="right", padx=10, pady=10)
+        # 如果有已选中的，重新高亮
+        if self.selected_sneaker:
+            for sn_obj, f_obj in zip(self.sneakers, self.list_container.winfo_children()):
+                if sn_obj.id == self.selected_sneaker.id:
+                    self.highlight_frame(f_obj)
+                    break
 
     def on_sort_change(self, choice):
-        # 根据 sort_var 重新排序 self.sneakers
-        if choice == "默认排序":
-            with get_db() as db:
-                self.sneakers = SneakerRepository.get_all(db)
-        elif choice == "总分从高到低":
+        """根据下拉重新给 self.sneakers 排序并刷新"""
+        # 先取消选择
+        self.selected_sneaker = None
+        self.selected_frame = None
+
+        # 排序逻辑
+        if choice == "总分从高到低":
             self.sneakers.sort(key=lambda s: calculate_total_score(s.ratings) or 0, reverse=True)
         elif choice == "总分从低到高":
-            self.sneakers.sort(key=lambda s: calculate_total_score(s.ratings) or 0)
+            self.sneakers.sort(key=lambda s: calculate_total_score(s.ratings) or 0, reverse=False)
         else:
-            # 具体维度排序
-            mapping = {
-                "缓震从高到低": ("cushion", True),
-                "抓地从高到低": ("traction", True),
-                "抗扭从高到低": ("torsion", True),
-                "耐磨从高到低": ("durability", True),
-                "包裹从高到低": ("wrap", True),
-                "防侧翻从高到低": ("anti_roll", True),
-                "重量从高到低": ("weight", True),
-                "舒适性从高到低": ("comfort", True),
+            # 针对各维度
+            field_map = {
+                "缓震": "cushion", "抓地": "traction", "抗扭": "torsion", "耐磨": "durability",
+                "包裹": "wrap", "防侧翻": "anti_roll", "重量": "weight", "舒适性": "comfort"
             }
-            if choice in mapping:
-                field, rev = mapping[choice]
-                self.sneakers.sort(key=lambda s: getattr(s.ratings[-1], field) if s.ratings else 0, reverse=rev)
+            for label, field in field_map.items():
+                if choice.startswith(label):
+                    rev = "高" in choice
+                    self.sneakers.sort(
+                        key=lambda s: getattr(s.ratings[-1], field) if s.ratings else 0,
+                        reverse=rev
+                    )
+                    break
+        self.render_list()
 
-        self.load_sneaker_rating_ui(self.content_frame, self.sneakers)
+    def on_select(self, sneaker, frame):
+        """列表项点击：高亮 & 渲染明细"""
+        self.selected_sneaker = sneaker
+        self.highlight_frame(frame)
+        self.render_detail(sneaker)
 
-    def open_rating_window(self, sneaker):
+    def highlight_frame(self, frame):
+        """把之前的取消高亮，新框设置黄色"""
+        if self.selected_frame and self.selected_frame.winfo_exists():
+            self.selected_frame.configure(border_color="#2d2d44")
+        frame.configure(border_color="#DDB92B")
+        self.selected_frame = frame
+
+    def render_detail(self, sneaker):
+        # 先用新 Session 彻底拉一遍
+        with get_db() as db:
+            sn = (
+                db.query(Sneaker)
+                .options(joinedload(Sneaker.ratings))
+                .filter(Sneaker.id == sneaker.id)
+                .first()
+            )
+        # 接下来都用 ’sn‘ 而不是原来的 ’sneaker‘
+        records = sn.ratings
+        """在下半区根据选中鞋渲染雷达图 + 文本"""
+        for w in self.radar_container.winfo_children(): w.destroy()
+        for w in self.text_container.winfo_children(): w.destroy()
+
+        # 如果没评分
+        if not sneaker.ratings:
+            ctk.CTkLabel(self.text_container, text="暂无评分记录",
+                         font=("微软雅黑", 14), text_color="white") \
+               .pack(pady=20)
+            return
+
+        latest = sneaker.ratings[-1]
+
+        # —— 雷达图 —— #
+        labels = ["缓震","抓地","抗扭","耐磨","包裹","防侧翻","重量","舒适"]
+        values = [
+            latest.cushion, latest.traction, latest.torsion, latest.durability,
+            latest.wrap, latest.anti_roll, latest.weight, latest.comfort
+        ]
+        angles = np.linspace(0, 2*np.pi, len(labels), endpoint=False).tolist()
+        vals = values + values[:1]
+        angs = angles + angles[:1]
+
+        fig = Figure(figsize=(4,3), dpi=100)
+        ax = fig.add_subplot(111, polar=True)
+        ax.plot(angs, vals, 'o-', linewidth=2, color='gold')
+        ax.fill(angs, vals, alpha=0.25, color='gold')
+        ax.set_thetagrids(np.degrees(angles), labels, fontproperties="SimHei")
+        ax.set_ylim(0,10)
+        ax.grid(color='gray', linestyle='--', linewidth=0.5)
+
+        canvas = FigureCanvasTkAgg(fig, master=self.radar_container)
+        canvas.draw()
+        canvas.get_tk_widget().pack(fill="both", expand=True)
+
+        # —— 文本描述 —— #
+        def add_txt(k, v):
+            text = f"{k}：{v or '无'}"
+            ctk.CTkLabel(self.text_container, text=text,
+                         font=("微软雅黑", 14), text_color="white", anchor="w")\
+               .pack(fill="x", padx=10, pady=2)
+
+        # 8 个量化
+        add_txt("缓震", f"{latest.cushion}/10")
+        add_txt("抓地", f"{latest.traction}/10")
+        add_txt("抗扭", f"{latest.torsion}/10")
+        add_txt("耐磨", f"{latest.durability}/10")
+        add_txt("包裹", f"{latest.wrap}/10")
+        add_txt("防侧翻", f"{latest.anti_roll}/10")
+        add_txt("重量", f"{latest.weight}/10")
+        add_txt("舒适性", f"{latest.comfort}/10")
+
+        # 4 个定性
+        add_txt("鞋楦",       latest.width)
+        add_txt("内长",       latest.inner_length)
+        add_txt("鞋垫",       latest.insole)
+        add_txt("鞋仓深度", latest.depth)
+
+    def reset_scores(self, sneaker):
+        """一键将该鞋所有评分字段重置为默认 5 分"""
+        with get_db() as db:
+            SneakerRepository.add_rating(
+                db,
+                sneaker.id,
+                cushion=5, traction=5, torsion=5, durability=5,
+                wrap=5, anti_roll=5, weight=5, comfort=5,
+                width=sneaker.ratings[-1].width   if sneaker.ratings else "",
+                inner_length=sneaker.ratings[-1].inner_length if sneaker.ratings else "",
+                insole=sneaker.ratings[-1].insole  if sneaker.ratings else "",
+                depth=sneaker.ratings[-1].depth   if sneaker.ratings else ""
+            )
+        # 重新拉 DB 并刷新列表、明细
+        self.load_sneakers()
+        # 取最新实例
+        with get_db() as db:
+            fresh = db.query(Sneaker).filter(Sneaker.id==sneaker.id).first()
+        self.selected_sneaker = fresh
+        self.render_detail(fresh)
+
+    def open_rating_window(self, sneaker: Sneaker):
         popup = ctk.CTkToplevel(self)
-        popup.title(f"评分：{sneaker.name}")
-        popup.geometry("600x750")
+        popup.title(f"评分：{sneaker.brand} - {sneaker.name}")
+        popup.geometry("1000x700")
         popup.resizable(False, False)
 
-        # 1. 取最新一条评分
-        from sqlalchemy.orm import joinedload
+        # 拉最新记录
         with get_db() as db:
-            sn = db.query(Sneaker) \
-                .options(joinedload(Sneaker.ratings)) \
-                .filter(Sneaker.id == sneaker.id) \
+            sn_db = (
+                db.query(Sneaker)
+                .options(joinedload(Sneaker.ratings))
+                .filter(Sneaker.id == sneaker.id)
                 .first()
-        latest = sn.ratings[-1] if sn and sn.ratings else None
+            )
+            latest = sn_db.ratings[-1] if sn_db.ratings else None
 
-        main = ctk.CTkFrame(popup)
-        main.pack(fill="both", expand=True, padx=20, pady=20)
+        # 滚动容器
+        canvas = tk.Canvas(popup, bg="#1e1e2d", highlightthickness=0)
+        vsb = tk.Scrollbar(popup, orient="vertical", command=canvas.yview)
+        container = ctk.CTkFrame(canvas, fg_color="transparent")
+        container.bind("<Configure>",
+                       lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
+        canvas.create_window((0, 0), window=container, anchor="nw")
+        canvas.configure(yscrollcommand=vsb.set)
+        canvas.pack(side="left", fill="both", expand=True)
+        vsb.pack(side="right", fill="y")
 
-        # 2. 滑条字段：1-10 分制
-        slider_cfg = {
-            'cushion': ("缓震", latest.cushion if latest else 5),
-            'traction': ("抓地", latest.traction if latest else 5),
-            'torsion': ("抗扭", latest.torsion if latest else 5),
-            'durability': ("耐磨", latest.durability if latest else 5),
-            'wrap': ("包裹", latest.wrap if latest else 5),
-            'anti_roll': ("防侧翻", latest.anti_roll if latest else 5),
-            'weight': ("重量", latest.weight if latest else 5),
-            'comfort': ("舒适性", latest.comfort if latest else 5),
-        }
-        sliders = {}
-        row = 0
-        for field, (label_text, init_val) in slider_cfg.items():
-            ctk.CTkLabel(main, text=label_text, width=80).grid(row=row, column=0, pady=5, sticky="w")
-            s = ctk.CTkSlider(main, from_=1, to=10, number_of_steps=9)
-            s.set(init_val)
-            s.grid(row=row, column=1, sticky="ew", padx=5)
-            vlabel = ctk.CTkLabel(main, text=f"{int(init_val)}/10", width=50)
-            vlabel.grid(row=row, column=2, padx=5)
-            # 滑条联动数值标签
-            s.configure(command=lambda v, l=vlabel: l.configure(text=f"{int(v)}/10"))
-            sliders[field] = s
-            row += 1
+        # —— 8 个滑杆 —— #
+        self.slider_vars = {}
+        dims = [
+            ("缓震", "cushion"), ("抓地", "traction"), ("抗扭", "torsion"), ("耐磨", "durability"),
+            ("包裹", "wrap"), ("防侧翻", "anti_roll"), ("重量", "weight"), ("舒适性", "comfort")
+        ]
+        for cn, field in dims:
+            f = ctk.CTkFrame(container, fg_color="transparent")
+            f.pack(fill="x", padx=20, pady=5)
+            ctk.CTkLabel(f, text=cn, width=60, text_color="white").pack(side="left")
 
-        # 3. 单选下拉：内长、鞋仓深度
-        inner_opts = ["偏短", "适中", "偏长"]
-        depth_opts = ["适合高脚背", "适合中等脚背", "适合低脚背"]
-        inner_var = tk.StringVar(value=(latest.inner_length if latest and latest.inner_length else inner_opts[1]))
-        depth_var = tk.StringVar(value=(latest.depth if latest and latest.depth else depth_opts[1]))
+            var = tk.IntVar(value=getattr(latest, field) if latest else 5)
+            slider = ctk.CTkSlider(
+                f, from_=1, to=10, number_of_steps=9,
+                variable=var, width=200
+            )
+            slider.pack(side="left", padx=(10,5))
 
-        ctk.CTkLabel(main, text="内长").grid(row=row, column=0, pady=5, sticky="w")
-        ctk.CTkOptionMenu(main, values=inner_opts, variable=inner_var).grid(row=row, column=1, columnspan=2,
-                                                                            sticky="ew", padx=5)
-        row += 1
+            val_lbl = ctk.CTkLabel(f, text=f"{var.get()}/10",
+                                   text_color="white", width=50)
+            val_lbl.pack(side="left", padx=(5,0))
+            var.trace_add("write",
+                          lambda *a, v=var, l=val_lbl: l.configure(text=f"{v.get()}/10"))
+            self.slider_vars[field] = var
 
-        ctk.CTkLabel(main, text="鞋仓深度").grid(row=row, column=0, pady=5, sticky="w")
-        ctk.CTkOptionMenu(main, values=depth_opts, variable=depth_var).grid(row=row, column=1, columnspan=2,
-                                                                            sticky="ew", padx=5)
-        row += 1
+        # —— 4 个定性 —— #
+        mults = [
+            ("鞋楦 (可多选)", "width", ["非常窄","窄","稍窄","适中","稍宽","宽","非常宽"]),
+            ("鞋垫 (可多选)", "insole",["薄","厚","弹","软","重","轻","足弓支撑强","足弓支撑弱"])
+        ]
+        self.multi_vars = {}
+        for label, attr, opts in mults:
+            ctk.CTkLabel(container, text=label,
+                         text_color="white", anchor="w")\
+               .pack(fill="x", padx=20, pady=(10,0))
+            frm = ctk.CTkFrame(container, fg_color="transparent")
+            frm.pack(fill="x", padx=20)
+            lst = []
+            current = getattr(latest, attr).split(";") if (latest and getattr(latest, attr)) else []
+            for opt in opts:
+                var = tk.BooleanVar(value=(opt in current))
+                ctk.CTkCheckBox(frm, text=opt, variable=var,
+                                text_color="white").pack(side="left", padx=5, pady=5)
+                lst.append((opt, var))
+            self.multi_vars[attr] = lst
 
-        # 4. 多选：鞋楦（width）和鞋垫（insole）
-        width_opts = ["非常窄", "窄", "稍窄", "适中", "稍宽", "宽", "非常宽"]
-        insole_opts = ["薄", "厚", "弹", "软", "重", "轻", "足弓支撑强", "足弓支撑弱"]
-        width_vars = {}
-        insole_vars = {}
-        saved_w = (latest.width or "").split(",") if latest and latest.width else []
-        saved_i = (latest.insole or "").split(",") if latest and latest.insole else []
+        singles = [
+            ("内长 (单选)", "inner_length", ["偏短","适中","偏长"]),
+            ("鞋仓深度 (单选)", "depth",
+             ["适合高脚背","适合中等脚背","适合低脚背"])
+        ]
+        self.single_vars = {}
+        for label, attr, opts in singles:
+            ctk.CTkLabel(container, text=label,
+                         text_color="white", anchor="w")\
+               .pack(fill="x", padx=20, pady=(10,0))
+            var = tk.StringVar(value=getattr(latest, attr) if latest else "")
+            om = ctk.CTkOptionMenu(
+                container, values=opts, variable=var,
+                fg_color="#3e3e5b", button_color="#3e3e5b",
+                text_color="white",
+                dropdown_fg_color="#2d2d44",
+                dropdown_text_color="white"
+            )
+            om.pack(fill="x", padx=20, pady=5)
+            self.single_vars[attr] = var
 
-        ctk.CTkLabel(main, text="鞋楦").grid(row=row, column=0, sticky="nw", pady=5)
-        wf = ctk.CTkFrame(main);
-        wf.grid(row=row, column=1, columnspan=2, sticky="w")
-        for i, opt in enumerate(width_opts):
-            width_vars[opt] = tk.BooleanVar(value=(opt in saved_w))
-            ctk.CTkCheckBox(wf, text=opt, variable=width_vars[opt]) \
-                .grid(row=i // 4, column=i % 4, padx=5, pady=2, sticky="w")
-        row += (len(width_opts) // 4 + 1)
-
-        ctk.CTkLabel(main, text="鞋垫").grid(row=row, column=0, sticky="nw", pady=5)
-        inf = ctk.CTkFrame(main);
-        inf.grid(row=row, column=1, columnspan=2, sticky="w")
-        for i, opt in enumerate(insole_opts):
-            insole_vars[opt] = tk.BooleanVar(value=(opt in saved_i))
-            ctk.CTkCheckBox(inf, text=opt, variable=insole_vars[opt]) \
-                .grid(row=i // 4, column=i % 4, padx=5, pady=2, sticky="w")
-        row += (len(insole_opts) // 4 + 1)
-
-        # 5. 提交按钮
+        # —— 提交按钮 —— #
         def submit():
-            w_val = ",".join([o for o, v in width_vars.items() if v.get()])
-            i_val = ",".join([o for o, v in insole_vars.items() if v.get()])
+            # --- 1. 各维度取值 --- #
+            # 滑杆
+            data = {
+                'cushion': self.slider_vars['cushion'].get(),
+                'traction': self.slider_vars['traction'].get(),
+                'torsion': self.slider_vars['torsion'].get(),
+                'durability': self.slider_vars['durability'].get(),
+                'wrap': self.slider_vars['wrap'].get(),
+                'anti_roll': self.slider_vars['anti_roll'].get(),
+                'weight': self.slider_vars['weight'].get(),
+                'comfort': self.slider_vars['comfort'].get(),
+            }
+            # 多选：鞋楦、鞋垫
+            sel_width = [opt for opt, var in self.multi_vars['width'] if var.get()]
+            sel_insole = [opt for opt, var in self.multi_vars['insole'] if var.get()]
+            data['width'] = ";".join(sel_width)
+            data['insole'] = ";".join(sel_insole)
+            # 单选：内长、仓深
+            data['inner_length'] = self.single_vars['inner_length'].get()
+            data['depth'] = self.single_vars['depth'].get()
+
+            # --- 2. 写库并 reload fresh instance --- #
             with get_db() as db:
-                SneakerRepository.add_rating(
-                    db,
-                    sneaker.id,
-                    cushion=int(sliders['cushion'].get()),
-                    traction=int(sliders['traction'].get()),
-                    torsion=int(sliders['torsion'].get()),
-                    durability=int(sliders['durability'].get()),
-                    wrap=int(sliders['wrap'].get()),
-                    anti_roll=int(sliders['anti_roll'].get()),
-                    weight=int(sliders['weight'].get()),
-                    comfort=int(sliders['comfort'].get()),
-                    width=w_val,
-                    inner_length=inner_var.get(),
-                    insole=i_val,
-                    depth=depth_var.get()
+                # 新增一条 Rating
+                record = Rating(
+                    sneaker_id=sneaker.id,
+                    **data
                 )
+                db.add(record)
+                db.commit()
+
+                # 重新拉一次 Sneaker + ratings
+                fresh = (
+                    db.query(Sneaker)
+                    .options(joinedload(Sneaker.ratings))
+                    .filter(Sneaker.id == sneaker.id)
+                    .first()
+                )
+
+            # --- 3. 关闭弹窗，刷新下方详情 --- #
             popup.destroy()
-            messagebox.showinfo("提示", "评分已保存！")
-            self.refresh()
+            self.render_detail(fresh)
 
-        ctk.CTkButton(main, text="提交评分", command=submit) \
-            .grid(row=row, column=0, columnspan=3, pady=20)
-
-        popup.grab_set()
-
-    def refresh(self):
-        """刷新评分列表：清空旧条目并重绘"""
-        for w in self.content_frame.winfo_children():
-            w.destroy()
-        self.load_sneaker_rating_ui(self.content_frame, self.sneakers)
+        # 注意：这里的 “提交评分” 按钮，一定要把 command 指向上面这个 submit()
+        ctk.CTkButton(container, text="提交评分",
+                      fg_color="#FFDF4E", text_color="black",
+                      command=submit).pack(pady=20)
